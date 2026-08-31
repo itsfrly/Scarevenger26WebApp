@@ -3,8 +3,13 @@ import type {
   APIGatewayProxyResultV2,
 } from "aws-lambda";
 import { randomUUID } from "node:crypto";
-import { DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { keys, prefixes, type Challenge } from "shared";
+import {
+  DeleteCommand,
+  GetCommand,
+  PutCommand,
+  TransactWriteCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { keys, prefixes, type Challenge, type User } from "shared";
 import { ddb, TABLE_NAME } from "../lib/ddb";
 import { caller, requireAdmin } from "../lib/auth";
 import { recomputeTeams } from "../lib/scoring";
@@ -63,6 +68,13 @@ export const handler = async (
         return json(204, {});
       }
 
+      case "POST /api/admin/players/{sub}/team": {
+        const sub = event.pathParameters?.sub;
+        if (!sub) throw new HttpError(400, "Player sub required");
+        const { teamId } = parseBody<{ teamId?: string | null }>(event.body);
+        return ok(await movePlayer(sub, teamId ?? null));
+      }
+
       case "POST /api/admin/recalculate":
         return ok(await recalculateAll());
 
@@ -73,6 +85,75 @@ export const handler = async (
         throw new HttpError(404, "Not found");
     }
   });
+
+/**
+ * Moves a player to another team, or off their team when teamId is null.
+ *
+ * Joining is otherwise one-way — teamId is written with
+ * attribute_not_exists — so without this a mistaken join needs a DynamoDB
+ * edit by hand. Both teams are recomputed because submissions belong to the
+ * team, not the player.
+ */
+async function movePlayer(sub: string, teamId: string | null) {
+  const res = await ddb.send(
+    new GetCommand({ TableName: TABLE_NAME, Key: keys.user(sub) }),
+  );
+  const user = res.Item as User | undefined;
+  if (!user) throw new HttpError(404, "Player not found");
+  if (user.teamId === teamId) return { sub, teamId };
+
+  const writes: NonNullable<
+    ConstructorParameters<typeof TransactWriteCommand>[0]["TransactItems"]
+  > = [];
+
+  if (user.teamId) {
+    writes.push({
+      Delete: { TableName: TABLE_NAME, Key: keys.member(user.teamId, sub) },
+    });
+  }
+
+  if (teamId) {
+    writes.push({
+      ConditionCheck: {
+        TableName: TABLE_NAME,
+        Key: keys.team(teamId),
+        ConditionExpression: "attribute_exists(pk)",
+      },
+    });
+    writes.push({
+      Put: {
+        TableName: TABLE_NAME,
+        Item: {
+          ...keys.member(teamId, sub),
+          teamId,
+          sub,
+          displayName: user.displayName,
+          joinedAt: new Date().toISOString(),
+        },
+      },
+    });
+    writes.push({
+      Update: {
+        TableName: TABLE_NAME,
+        Key: keys.user(sub),
+        UpdateExpression: "SET teamId = :t",
+        ExpressionAttributeValues: { ":t": teamId },
+      },
+    });
+  } else {
+    writes.push({
+      Update: {
+        TableName: TABLE_NAME,
+        Key: keys.user(sub),
+        UpdateExpression: "REMOVE teamId",
+      },
+    });
+  }
+
+  await ddb.send(new TransactWriteCommand({ TransactItems: writes }));
+  await recomputeTeams([user.teamId, teamId].filter((t): t is string => Boolean(t)));
+  return { sub, teamId };
+}
 
 /** Safety net: rebuilds every team's score from submissions and placements. */
 async function recalculateAll(): Promise<{ teams: number }> {

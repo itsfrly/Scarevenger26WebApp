@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, ChevronRight, Trophy, X } from "lucide-react";
+import { Check, ChevronRight, Copy, Trophy, X } from "lucide-react";
 import type { Challenge, Submission, User } from "shared";
 import { useChallenges, useTeam } from "@/lib/queries";
-import { Card, ErrorNote, Screen, Spinner } from "@/components/ui";
+import { Button, Card, ErrorNote, Screen, Spinner } from "@/components/ui";
 
 export default function Challenges({ user }: { user: User }) {
   const challenges = useChallenges();
@@ -30,6 +31,10 @@ export default function Challenges({ user }: { user: User }) {
         </p>
       </header>
 
+      {"joinCode" in (team.data?.team ?? {}) && (
+        <InviteCard code={(team.data!.team as { joinCode: string }).joinCode} />
+      )}
+
       <ul className="space-y-2">
         {list.map((c) => (
           <li key={c.challengeId}>
@@ -38,6 +43,48 @@ export default function Challenges({ user }: { user: User }) {
         ))}
       </ul>
     </Screen>
+  );
+}
+
+/** Shown only to team members — the API omits the code for everyone else. */
+function InviteCard({ code }: { code: string }) {
+  const [copied, setCopied] = useState<"link" | "code" | null>(null);
+  const link = `${window.location.origin}/team?invite=${code}`;
+
+  const copy = async (what: "link" | "code", value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(what);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // Clipboard needs a secure context and can be refused; the code is
+      // displayed anyway so it can always be read out.
+    }
+  };
+
+  return (
+    <Card className="mb-5">
+      <p className="mb-2 text-sm text-zinc-400">
+        Share this so your team can join. Nobody can join without it.
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => void copy("code", code)}
+          className="flex-1 rounded-xl bg-zinc-800 py-3 font-mono text-2xl font-bold tracking-[0.3em] text-orange-400"
+        >
+          {code}
+        </button>
+        <Button variant="ghost" onClick={() => void copy("link", link)}>
+          <Copy className="size-5" />
+          Link
+        </Button>
+      </div>
+      {copied && (
+        <p className="mt-2 text-center text-xs text-emerald-400">
+          {copied === "link" ? "Link copied" : "Code copied"}
+        </p>
+      )}
+    </Card>
   );
 }
 

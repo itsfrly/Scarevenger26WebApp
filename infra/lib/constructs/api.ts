@@ -82,7 +82,7 @@ export class Api extends Construct {
     this.route("GET", "/api/teams", teams);
     this.route("POST", "/api/teams", teams);
     this.route("GET", "/api/teams/{id}", teams);
-    this.route("POST", "/api/teams/{id}/members", teams);
+    this.route("POST", "/api/teams/join", teams);
     this.route("GET", "/api/scoreboard", teams);
     this.route("GET", "/api/challenges", challenges);
     this.route("POST", "/api/submissions", challenges);
@@ -92,6 +92,7 @@ export class Api extends Construct {
     this.route("PUT", "/api/judge/challenges/{id}/placements", judge);
     this.route("PUT", "/api/admin/challenges", admin);
     this.route("POST", "/api/admin/recalculate", admin);
+    this.route("POST", "/api/admin/players/{sub}/team", admin);
     this.route("DELETE", "/api/admin/challenges/{id}", admin);
     this.route("GET", "/api/admin/export", admin);
   }

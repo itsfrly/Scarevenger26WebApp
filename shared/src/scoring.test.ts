@@ -1,6 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { teamScore, fileCountValid, type Challenge, type Submission } from "./index";
+import {
+  teamScore,
+  fileCountValid,
+  normalizeJoinCode,
+  generateJoinCode,
+  type Challenge,
+  type Submission,
+} from "./index";
 
 const challenge = (over: Partial<Challenge>): Challenge => ({
   challengeId: "c1",
@@ -109,4 +116,16 @@ test("proof type governs file count", () => {
   assert.ok(fileCountValid(challenge({ proofType: "photos", maxFiles: 3 }), 3));
   assert.ok(!fileCountValid(challenge({ proofType: "photos", maxFiles: 3 }), 4));
   assert.ok(fileCountValid(challenge({ proofType: "video" }), 1));
+});
+
+test("join codes normalise for retyping", () => {
+  assert.equal(normalizeJoinCode(" ab-cd 12 "), "ABCD12");
+  assert.equal(normalizeJoinCode("abcd12"), normalizeJoinCode("ABCD12"));
+});
+
+test("generated codes avoid ambiguous characters", () => {
+  let i = 0;
+  const code = generateJoinCode(() => i++ % 29);
+  assert.equal(code.length, 6);
+  assert.ok(!/[OIL01UV]/.test(code), `ambiguous character in ${code}`);
 });

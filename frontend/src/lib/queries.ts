@@ -72,7 +72,7 @@ export const useCreateTeam = () =>
 
 export const useJoinTeam = () =>
   useInvalidating(
-    (teamId: string) => api.post(`/teams/${teamId}/members`, {}),
+    (code: string) => api.post("/teams/join", { code }),
     ["me", "teams", "team"],
   );
 

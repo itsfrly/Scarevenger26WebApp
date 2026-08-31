@@ -79,6 +79,9 @@ export interface User {
 export interface Team {
   teamId: string;
   name: string;
+  /** Shared by the team; required to join. Rotatable by an admin. */
+  joinCode: string;
+  createdBy: string;
   /** Recomputed from submissions and placements; never incremented in place. */
   score: number;
   createdAt: string;
@@ -159,7 +162,33 @@ export const keys = {
     pk: `EVENT#${EVENT_YEAR}`,
     sk: `CHALLENGE#${challengeId}`,
   }),
+  /**
+   * Lookup item pointing a join code at its team. A separate item rather than
+   * a GSI: it doubles as a uniqueness constraint, since a conditional put on
+   * the same key fails if the code is already taken.
+   */
+  joinCode: (code: string) => ({
+    pk: `JOINCODE#${normalizeJoinCode(code)}`,
+    sk: "TEAM",
+  }),
 } as const;
+
+/** Codes are case-insensitive and ignore spaces, because people retype them. */
+export function normalizeJoinCode(code: string): string {
+  return code.trim().toUpperCase().replace(/[\s-]/g, "");
+}
+
+/**
+ * Ambiguous characters removed: no O/0, I/1/L, U/V. A code read aloud across
+ * a dark garden should not depend on hearing the difference.
+ */
+const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTWXYZ23456789";
+
+export function generateJoinCode(random: (max: number) => number): string {
+  let out = "";
+  for (let i = 0; i < 6; i++) out += CODE_ALPHABET[random(CODE_ALPHABET.length)];
+  return out;
+}
 
 /** Spread into the Item alongside `keys`, never into a Key. */
 export const indexKeys = {
