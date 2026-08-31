@@ -1,0 +1,20 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# CDK
+infra/cdk.out/
+cdk.out/
+# Holds resolved context values, including anything passed with -c.
+cdk.context.json
+
+# Local env / credentials
+.env
+.env.*
+!.env.example
+
+# Frontend build output
+frontend/dist/
+
+# macOS
+.DS_Store

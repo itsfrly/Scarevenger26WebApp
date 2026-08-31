@@ -1,0 +1,15 @@
+{
+  "name": "scavenger-hunt",
+  "private": true,
+  "workspaces": [
+    "infra",
+    "backend",
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace=shared",
+    "build:backend": "npm run build --workspace=backend",
+    "cdk": "npm run cdk --workspace=infra"
+  }
+}
