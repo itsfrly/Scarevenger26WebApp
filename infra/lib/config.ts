@@ -1,31 +1,17 @@
 import { Construct } from "constructs";
 
-// Set in your shell profile; nothing here is committed.
-//   SCAREVENGER_GOOGLE_CLIENT_ID
-//   SCAREVENGER_CERT_ARN              (only when SCAREVENGER_CUSTOM_AUTH_DOMAIN=true)
-//   SCAREVENGER_CUSTOM_AUTH_DOMAIN
-
-const DOMAIN_NAME = "scarevenger.app";
-const LOCAL_DEV_ORIGIN = "http://localhost:5173";
-
 /**
- * Extra HTTPS origin allowed through the OAuth flow, for testing on a phone.
- * Cognito permits http:// only for localhost, so a LAN IP will not work --
- * point a tunnel at the dev server and set this to its hostname:
+ * Deployment configuration.
  *
- *   export SCAREVENGER_DEV_ORIGIN=https://dev.scarevenger.app
+ * Non-secret settings live in `cdk.json` under `scarevenger:*` so local and CI
+ * deploys cannot disagree — a flag change is a reviewable commit, not two
+ * places to keep in sync. Environment variables override for one-off local
+ * testing.
+ *
+ * The ACM certificate ARN is the one exception: it contains the AWS account
+ * id, so it stays out of the repo and comes from SCAREVENGER_CERT_ARN (the
+ * CERT_ARN GitHub secret in CI).
  */
-function devOrigin(scope: Construct): string | undefined {
-  const value =
-    scope.node.tryGetContext("devOrigin") ?? process.env.SCAREVENGER_DEV_ORIGIN;
-  if (!value) return undefined;
-  if (!String(value).startsWith("https://")) {
-    throw new Error(
-      `SCAREVENGER_DEV_ORIGIN must be https:// -- Cognito rejects http for anything but localhost. Got: ${value}`,
-    );
-  }
-  return String(value).replace(/\/$/, "");
-}
 
 export interface CustomAuthDomain {
   readonly domainName: string;
@@ -35,120 +21,130 @@ export interface CustomAuthDomain {
 export interface ScavengerConfig {
   readonly domainName: string;
   readonly customAuthDomain?: CustomAuthDomain;
-  /** Apex domain on CloudFront. Same switch and certificate as the auth domain. */
   readonly customSiteDomain?: CustomAuthDomain;
   readonly authDomainPrefix: string;
   readonly googleClientId: string;
   readonly googleClientSecretName: string;
   readonly callbackUrls: string[];
   readonly logoutUrls: string[];
-  /** Flip on once WAF COUNT metrics show no false positives. */
   readonly blockManagedRules: boolean;
-  /** Enable the 15-minute event snapshots. Off outside the event window. */
   readonly snapshotsEnabled: boolean;
-  /** Optional: address to receive alarm notifications. */
   readonly alarmEmail?: string;
   readonly repository: string;
   readonly deployBranch: string;
   readonly githubOidcProviderExists: boolean;
 }
 
+const LOCAL_DEV_ORIGIN = "http://localhost:5173";
+
 export function resolveConfig(scope: Construct): ScavengerConfig {
+  const domainName = str(scope, "domainName", "scarevenger.app");
   const googleClientId = required(
     scope,
     "googleClientId",
     "SCAREVENGER_GOOGLE_CLIENT_ID",
-    "Google OAuth web client ID.",
+    "Google OAuth web client ID. Set scarevenger:googleClientId in cdk.json.",
   );
 
-  const useCustomDomain =
-    String(
-      scope.node.tryGetContext("customAuthDomain") ??
-        process.env.SCAREVENGER_CUSTOM_AUTH_DOMAIN ??
-        "false",
-    ).toLowerCase() === "true";
-
+  const useCustomDomain = bool(scope, "customAuthDomain");
   const certificateArn = useCustomDomain
-    ? required(
-        scope,
-        "certificateArn",
+    ? requiredEnv(
         "SCAREVENGER_CERT_ARN",
-        "ACM cert ARN. aws acm list-certificates --region us-east-1",
+        "ACM cert ARN (us-east-1). Kept out of the repo because it contains " +
+          "the account id.\n" +
+          "    aws acm list-certificates --region us-east-1",
       )
     : undefined;
 
+  const custom = certificateArn
+    ? { domainName: `login.${domainName}`, certificateArn }
+    : undefined;
+
+  // Extra HTTPS origin for testing on a real device through a tunnel. Cognito
+  // permits http only for localhost, so a LAN IP will not work.
   const dev = devOrigin(scope);
 
   return {
-    domainName: DOMAIN_NAME,
-    customSiteDomain:
-      useCustomDomain && certificateArn
-        ? { domainName: DOMAIN_NAME, certificateArn }
-        : undefined,
-    customAuthDomain: useCustomDomain
-      ? { domainName: `login.${DOMAIN_NAME}`, certificateArn: certificateArn! }
+    domainName,
+    customAuthDomain: custom,
+    customSiteDomain: certificateArn
+      ? { domainName, certificateArn }
       : undefined,
-    authDomainPrefix:
-      scope.node.tryGetContext("authDomainPrefix") ??
-      process.env.SCAREVENGER_AUTH_DOMAIN_PREFIX ??
-      "scarevenger",
+    authDomainPrefix: str(scope, "authDomainPrefix", "scarevenger"),
     googleClientId,
-    googleClientSecretName:
-      scope.node.tryGetContext("googleClientSecretName") ??
-      process.env.SCAREVENGER_GOOGLE_SECRET_NAME ??
+    googleClientSecretName: str(
+      scope,
+      "googleClientSecretName",
       "scarevenger/google-oauth-client-secret",
-    snapshotsEnabled:
-      String(
-        scope.node.tryGetContext("snapshotsEnabled") ??
-          process.env.SCAREVENGER_SNAPSHOTS_ENABLED ??
-          "false",
-      ).toLowerCase() === "true",
-    repository:
-      scope.node.tryGetContext("repository") ??
-      process.env.SCAREVENGER_REPO ??
-      "itsfrly/Scarevenger26WebApp",
-    deployBranch:
-      scope.node.tryGetContext("deployBranch") ??
-      process.env.SCAREVENGER_DEPLOY_BRANCH ??
-      "main",
-    githubOidcProviderExists:
-      String(
-        scope.node.tryGetContext("githubOidcProviderExists") ??
-          process.env.SCAREVENGER_GITHUB_OIDC_EXISTS ??
-          "false",
-      ).toLowerCase() === "true",
-    alarmEmail:
-      scope.node.tryGetContext("alarmEmail") ??
-      process.env.SCAREVENGER_ALARM_EMAIL ??
-      undefined,
-    blockManagedRules:
-      String(
-        scope.node.tryGetContext("blockManagedRules") ??
-          process.env.SCAREVENGER_BLOCK_MANAGED_RULES ??
-          "false",
-      ).toLowerCase() === "true",
+    ),
     callbackUrls: [
-      `https://${DOMAIN_NAME}/auth/callback`,
+      `https://${domainName}/auth/callback`,
       `${LOCAL_DEV_ORIGIN}/auth/callback`,
+      ...(dev ? [`${dev}/auth/callback`] : []),
     ],
-    logoutUrls: [`https://${DOMAIN_NAME}/`, `${LOCAL_DEV_ORIGIN}/`],
+    logoutUrls: [
+      `https://${domainName}/`,
+      `${LOCAL_DEV_ORIGIN}/`,
+      ...(dev ? [`${dev}/`] : []),
+    ],
+    blockManagedRules: bool(scope, "blockManagedRules"),
+    snapshotsEnabled: bool(scope, "snapshotsEnabled"),
+    alarmEmail: str(scope, "alarmEmail", "") || undefined,
+    repository: str(scope, "repository", ""),
+    deployBranch: str(scope, "deployBranch", "main"),
+    githubOidcProviderExists: bool(scope, "githubOidcProviderExists"),
   };
 }
 
-// Env var fallback matters because `cdk destroy` synthesizes too: a
-// context-only value locks you out of tearing down a broken stack.
+// --- lookup helpers -------------------------------------------------------
+// Precedence: -c flag, then SCAREVENGER_<UPPER_SNAKE>, then cdk.json.
+
+const envName = (key: string) =>
+  `SCAREVENGER_${key.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+
+function raw(scope: Construct, key: string): unknown {
+  return (
+    scope.node.tryGetContext(key) ??
+    process.env[envName(key)] ??
+    scope.node.tryGetContext(`scarevenger:${key}`)
+  );
+}
+
+function str(scope: Construct, key: string, fallback: string): string {
+  const v = raw(scope, key);
+  return typeof v === "string" && v.length > 0 ? v : fallback;
+}
+
+function bool(scope: Construct, key: string): boolean {
+  return String(raw(scope, key) ?? "false").toLowerCase() === "true";
+}
+
 function required(
   scope: Construct,
-  contextKey: string,
+  key: string,
   envVar: string,
   help: string,
 ): string {
-  const value = scope.node.tryGetContext(contextKey) ?? process.env[envVar];
-  if (typeof value !== "string" || value.length === 0) {
+  const v = raw(scope, key);
+  if (typeof v !== "string" || v.length === 0) {
+    throw new Error(`Missing ${key}.\n  ${help}\n  Or: export ${envVar}=<value>`);
+  }
+  return v;
+}
+
+function requiredEnv(envVar: string, help: string): string {
+  const v = process.env[envVar];
+  if (!v) throw new Error(`Missing ${envVar}.\n  ${help}`);
+  return v;
+}
+
+function devOrigin(scope: Construct): string | undefined {
+  const v = raw(scope, "devOrigin");
+  if (typeof v !== "string" || v.length === 0) return undefined;
+  if (!v.startsWith("https://")) {
     throw new Error(
-      `Missing ${contextKey}. ${help}\n` +
-        `  export ${envVar}=<value>   (or -c ${contextKey}=<value>)`,
+      `devOrigin must be https:// — Cognito rejects http for anything but localhost. Got: ${v}`,
     );
   }
-  return value;
+  return v.replace(/\/$/, "");
 }

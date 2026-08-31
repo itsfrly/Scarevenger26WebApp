@@ -44,11 +44,8 @@ jobs:
       - name: Deploy
         working-directory: infra
         env:
-          SCAREVENGER_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          # Everything else comes from infra/cdk.json, so a local deploy and a
+          # CI deploy cannot disagree. Only the cert ARN is held back, because
+          # it contains the AWS account id.
           SCAREVENGER_CERT_ARN: ${{ secrets.CERT_ARN }}
-          SCAREVENGER_CUSTOM_AUTH_DOMAIN: ${{ vars.CUSTOM_AUTH_DOMAIN }}
-          SCAREVENGER_BLOCK_MANAGED_RULES: ${{ vars.BLOCK_MANAGED_RULES }}
-          SCAREVENGER_SNAPSHOTS_ENABLED: ${{ vars.SNAPSHOTS_ENABLED }}
-          SCAREVENGER_ALARM_EMAIL: ${{ vars.ALARM_EMAIL }}
-          SCAREVENGER_GITHUB_OIDC_EXISTS: "true"
         run: npx cdk deploy --require-approval never
