@@ -34,6 +34,10 @@ export class Cicd extends Construct {
     super(scope, id);
 
     const { account, region } = cdk.Stack.of(this);
+    const [owner, repo] = props.repository.split("/");
+    if (!owner || !repo) {
+      throw new Error(`repository must be "owner/name", got: ${props.repository}`);
+    }
 
     const provider = props.providerExists
       ? iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
@@ -58,8 +62,21 @@ export class Cicd extends Construct {
           },
           // Pinned to one branch of one repo. Without this condition any
           // GitHub repository in the world could assume the role.
+          //
+          // Two patterns because GitHub changed the subject format: repos
+          // created after 2026-07-15 emit immutable owner and repository ids
+          // (repo:owner@123/name@456:...) instead of bare names. The `@*`
+          // only matches that id segment -- owner logins cannot contain `@`,
+          // so this cannot widen to a different owner.
+          //
+          // Note this matches on the branch ref, which means the deploy job
+          // must NOT declare a GitHub `environment:`. Doing so replaces the
+          // ref in the subject with `environment:<name>` and the match fails.
           StringLike: {
-            [`${GITHUB_ISSUER}:sub`]: `repo:${props.repository}:ref:refs/heads/${props.branch}`,
+            [`${GITHUB_ISSUER}:sub`]: [
+              `repo:${props.repository}:ref:refs/heads/${props.branch}`,
+              `repo:${owner}@*/${repo}@*:ref:refs/heads/${props.branch}`,
+            ],
           },
         },
       ),

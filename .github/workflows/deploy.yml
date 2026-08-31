@@ -17,7 +17,11 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    # Deliberately no `environment:`. Declaring one rewrites the OIDC subject
+    # claim to `...:environment:<name>` and drops the branch ref, which the
+    # IAM trust policy matches on. Branch restriction would then have to come
+    # from a GitHub deployment-branch policy instead — splitting one security
+    # property across two systems.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
