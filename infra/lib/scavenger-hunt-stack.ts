@@ -3,6 +3,7 @@ import { Construct } from "constructs";
 import { resolveConfig } from "./config";
 import { AppSecrets } from "./constructs/secrets";
 import { Auth } from "./constructs/auth";
+import { Data } from "./constructs/data";
 
 export class ScavengerHuntStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -24,8 +25,10 @@ export class ScavengerHuntStack extends cdk.Stack {
       logoutUrls: config.logoutUrls,
     });
 
-    // Next: DynamoDB, Lambda + IAM, API Gateway + JWT authorizer, S3,
-    // CloudFront, WAF, CloudWatch + X-Ray. See ARCHITECTURE.md.
+    const data = new Data(this, "Data");
+
+    // Next: Lambda + IAM, API Gateway + JWT authorizer, S3, CloudFront, WAF,
+    // CloudWatch + X-Ray, admin export. See ARCHITECTURE.md.
 
     new cdk.CfnOutput(this, "UserPoolId", { value: auth.userPool.userPoolId });
     new cdk.CfnOutput(this, "UserPoolClientId", {
@@ -42,6 +45,7 @@ export class ScavengerHuntStack extends cdk.Stack {
         description: "Cloudflare CNAME target for `login`. DNS only.",
       });
     }
+    new cdk.CfnOutput(this, "TableName", { value: data.table.tableName });
     new cdk.CfnOutput(this, "EventCodeSecretArn", {
       value: secrets.eventCode.secretArn,
       description: "Overwrite the generated value before the event.",

@@ -114,6 +114,15 @@ export class Auth extends Construct {
     // so without this the client can deploy first and fail with "identity
     // provider does not exist".
     this.userPoolClient.node.addDependency(googleProvider);
+
+    // Membership is assigned by hand in the console and arrives in the JWT as
+    // cognito:groups, so the API authorizes admins without a DB read. Lost
+    // when the pool is destroyed, so re-add admins after each rebuild.
+    new cognito.CfnUserPoolGroup(this, "AdminGroup", {
+      userPoolId: this.userPool.userPoolId,
+      groupName: "admins",
+      description: "Can manage challenges and export event data.",
+    });
   }
 
   // CNAME target for `login` in Cloudflare. Custom domain mode only.
