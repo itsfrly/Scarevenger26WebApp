@@ -10,6 +10,7 @@
   "scripts": {
     "build:shared": "npm run build --workspace=shared",
     "build:backend": "npm run build --workspace=backend",
-    "cdk": "npm run cdk --workspace=infra"
+    "cdk": "npm run cdk --workspace=infra",
+    "test": "npm run test --workspace=shared"
   }
 }

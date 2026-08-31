@@ -16,6 +16,8 @@ export interface CustomAuthDomain {
 export interface ScavengerConfig {
   readonly domainName: string;
   readonly customAuthDomain?: CustomAuthDomain;
+  /** Apex domain on CloudFront. Same switch and certificate as the auth domain. */
+  readonly customSiteDomain?: CustomAuthDomain;
   readonly authDomainPrefix: string;
   readonly googleClientId: string;
   readonly googleClientSecretName: string;
@@ -38,18 +40,23 @@ export function resolveConfig(scope: Construct): ScavengerConfig {
         "false",
     ).toLowerCase() === "true";
 
+  const certificateArn = useCustomDomain
+    ? required(
+        scope,
+        "certificateArn",
+        "SCAREVENGER_CERT_ARN",
+        "ACM cert ARN. aws acm list-certificates --region us-east-1",
+      )
+    : undefined;
+
   return {
     domainName: DOMAIN_NAME,
+    customSiteDomain:
+      useCustomDomain && certificateArn
+        ? { domainName: DOMAIN_NAME, certificateArn }
+        : undefined,
     customAuthDomain: useCustomDomain
-      ? {
-          domainName: `login.${DOMAIN_NAME}`,
-          certificateArn: required(
-            scope,
-            "certificateArn",
-            "SCAREVENGER_CERT_ARN",
-            "ACM cert ARN. aws acm list-certificates --region us-east-1",
-          ),
-        }
+      ? { domainName: `login.${DOMAIN_NAME}`, certificateArn: certificateArn! }
       : undefined,
     authDomainPrefix:
       scope.node.tryGetContext("authDomainPrefix") ??

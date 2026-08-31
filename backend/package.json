@@ -8,9 +8,18 @@
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
     "@types/node": "^22.0.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.6.0"
   },
   "dependencies": {
+    "@aws-lambda-powertools/logger": "^2.35.0",
+    "@aws-lambda-powertools/metrics": "^2.35.0",
+    "@aws-lambda-powertools/tracer": "^2.35.0",
+    "@aws-sdk/client-dynamodb": "^3.1121.0",
+    "@aws-sdk/client-s3": "^3.1121.0",
+    "@aws-sdk/client-secrets-manager": "^3.1121.0",
+    "@aws-sdk/lib-dynamodb": "^3.1121.0",
+    "@aws-sdk/s3-presigned-post": "^3.1121.0",
     "shared": "*"
   }
 }

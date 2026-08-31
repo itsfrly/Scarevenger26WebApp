@@ -4,6 +4,9 @@ import { resolveConfig } from "./config";
 import { AppSecrets } from "./constructs/secrets";
 import { Auth } from "./constructs/auth";
 import { Data } from "./constructs/data";
+import { Api } from "./constructs/api";
+import { Media } from "./constructs/media";
+import { Cdn } from "./constructs/cdn";
 
 export class ScavengerHuntStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -27,8 +30,27 @@ export class ScavengerHuntStack extends cdk.Stack {
 
     const data = new Data(this, "Data");
 
-    // Next: Lambda + IAM, API Gateway + JWT authorizer, S3, CloudFront, WAF,
-    // CloudWatch + X-Ray, admin export. See ARCHITECTURE.md.
+    const media = new Media(this, "Media", {
+      uploadOrigins: [`https://${config.domainName}`, "http://localhost:5173"],
+      retainAfterDays: 90,
+    });
+
+    const api = new Api(this, "Api", {
+      table: data.table,
+      mediaBucket: media.bucket,
+      eventCode: secrets.eventCode,
+      userPool: auth.userPool,
+      userPoolClient: auth.userPoolClient,
+    });
+
+    const cdn = new Cdn(this, "Cdn", {
+      mediaBucket: media.bucket,
+      httpApi: api.httpApi,
+      customDomain: config.customSiteDomain,
+    });
+
+    // Next: WAF on the distribution, CloudWatch + X-Ray dashboard, scheduled
+    // export snapshots, frontend build + BucketDeployment.
 
     new cdk.CfnOutput(this, "UserPoolId", { value: auth.userPool.userPoolId });
     new cdk.CfnOutput(this, "UserPoolClientId", {
@@ -46,6 +68,14 @@ export class ScavengerHuntStack extends cdk.Stack {
       });
     }
     new cdk.CfnOutput(this, "TableName", { value: data.table.tableName });
+    new cdk.CfnOutput(this, "ApiUrl", { value: api.httpApi.apiEndpoint });
+    new cdk.CfnOutput(this, "MediaBucket", { value: media.bucket.bucketName });
+    new cdk.CfnOutput(this, "SiteUrl", { value: cdn.url });
+    new cdk.CfnOutput(this, "SiteBucket", { value: cdn.siteBucket.bucketName });
+    new cdk.CfnOutput(this, "DistributionId", {
+      value: cdn.distribution.distributionId,
+      description: "For cache invalidation after a frontend deploy.",
+    });
     new cdk.CfnOutput(this, "EventCodeSecretArn", {
       value: secrets.eventCode.secretArn,
       description: "Overwrite the generated value before the event.",

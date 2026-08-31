@@ -121,7 +121,13 @@ export class Auth extends Construct {
     new cognito.CfnUserPoolGroup(this, "AdminGroup", {
       userPoolId: this.userPool.userPoolId,
       groupName: "admins",
-      description: "Can manage challenges and export event data.",
+      description: "Can manage challenges and export event data. Implies judge.",
+    });
+
+    new cognito.CfnUserPoolGroup(this, "JudgeGroup", {
+      userPoolId: this.userPool.userPoolId,
+      groupName: "judges",
+      description: "Can review submissions and assign placements, nothing else.",
     });
   }
 
