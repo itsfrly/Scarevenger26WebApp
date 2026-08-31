@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # `npm install`, not `npm ci`: npm's optional-dependency bug can leave a
+      # lockfile without the platform binaries a different OS needs
+      # (esbuild, rollup), and `npm ci` will not repair it.
+      - run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: |
+          for p in shared backend infra frontend; do
+            echo "--- $p"
+            npx tsc --noEmit -p "$p/tsconfig.json"
+          done
+
+      - name: Unit tests
+        run: npm test
+
+      # No AWS credentials here, so stub the values the config requires. This
+      # proves the frontend compiles and bundles; it is not the deployed build.
+      - name: Build frontend
+        env:
+          VITE_AUTH_AUTHORITY: https://example.invalid/ci
+          VITE_AUTH_CLIENT_ID: ci
+          VITE_AUTH_DOMAIN: https://example.invalid
+        run: npm run build --workspace=frontend

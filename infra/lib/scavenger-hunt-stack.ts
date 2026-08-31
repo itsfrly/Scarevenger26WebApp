@@ -10,6 +10,7 @@ import { Cdn } from "./constructs/cdn";
 import { Firewall } from "./constructs/firewall";
 import { Snapshots } from "./constructs/snapshots";
 import { Observability } from "./constructs/observability";
+import { Cicd } from "./constructs/cicd";
 
 export class ScavengerHuntStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -72,7 +73,13 @@ export class ScavengerHuntStack extends cdk.Stack {
       alarmEmail: config.alarmEmail,
     });
 
-    // Next: CI/CD with GitHub OIDC, custom domain cutover.
+    const cicd = new Cicd(this, "Cicd", {
+      repository: config.repository,
+      branch: config.deployBranch,
+      providerExists: config.githubOidcProviderExists,
+    });
+
+    // Next: custom domain cutover.
 
     new cdk.CfnOutput(this, "UserPoolId", { value: auth.userPool.userPoolId });
     new cdk.CfnOutput(this, "UserPoolClientId", {
@@ -92,6 +99,10 @@ export class ScavengerHuntStack extends cdk.Stack {
     new cdk.CfnOutput(this, "TableName", { value: data.table.tableName });
     new cdk.CfnOutput(this, "ApiUrl", { value: api.httpApi.apiEndpoint });
     new cdk.CfnOutput(this, "MediaBucket", { value: media.bucket.bucketName });
+    new cdk.CfnOutput(this, "GithubDeployRoleArn", {
+      value: cicd.role.roleArn,
+      description: "Set as the AWS_DEPLOY_ROLE secret in the GitHub repo.",
+    });
     new cdk.CfnOutput(this, "SnapshotsBucket", {
       value: snapshots.bucket.bucketName,
       description: "Scheduled event snapshots. latest.csv is the paper fallback.",

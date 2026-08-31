@@ -16,6 +16,9 @@ cdk.context.json
 # Frontend build output
 frontend/dist/
 
+# Vite transpiles a TS config to a temp file; normally cleaned up immediately.
+*.timestamp-*.mjs
+
 # macOS
 .DS_Store
 HANDOFF.md

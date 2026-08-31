@@ -1,0 +1,54 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Two deploys at once means a CloudFormation conflict. Queue instead.
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # required to request the OIDC token
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install --no-audit --no-fund
+
+      - name: Assume the deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE }}
+          aws-region: us-east-1
+
+      # Reads the live stack outputs, so the bundle is built against the real
+      # user pool. Requires the stack to already exist -- the first deploy in
+      # a fresh account is done locally.
+      - name: Generate frontend env from stack outputs
+        run: npx tsx backend/scripts/write-frontend-env.ts
+
+      - name: Build frontend
+        run: npm run build --workspace=frontend
+
+      - name: Deploy
+        working-directory: infra
+        env:
+          SCAREVENGER_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          SCAREVENGER_CERT_ARN: ${{ secrets.CERT_ARN }}
+          SCAREVENGER_CUSTOM_AUTH_DOMAIN: ${{ vars.CUSTOM_AUTH_DOMAIN }}
+          SCAREVENGER_BLOCK_MANAGED_RULES: ${{ vars.BLOCK_MANAGED_RULES }}
+          SCAREVENGER_SNAPSHOTS_ENABLED: ${{ vars.SNAPSHOTS_ENABLED }}
+          SCAREVENGER_ALARM_EMAIL: ${{ vars.ALARM_EMAIL }}
+          SCAREVENGER_GITHUB_OIDC_EXISTS: "true"
+        run: npx cdk deploy --require-approval never

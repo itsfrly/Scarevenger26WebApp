@@ -48,6 +48,9 @@ export interface ScavengerConfig {
   readonly snapshotsEnabled: boolean;
   /** Optional: address to receive alarm notifications. */
   readonly alarmEmail?: string;
+  readonly repository: string;
+  readonly deployBranch: string;
+  readonly githubOidcProviderExists: boolean;
 }
 
 export function resolveConfig(scope: Construct): ScavengerConfig {
@@ -98,6 +101,20 @@ export function resolveConfig(scope: Construct): ScavengerConfig {
       String(
         scope.node.tryGetContext("snapshotsEnabled") ??
           process.env.SCAREVENGER_SNAPSHOTS_ENABLED ??
+          "false",
+      ).toLowerCase() === "true",
+    repository:
+      scope.node.tryGetContext("repository") ??
+      process.env.SCAREVENGER_REPO ??
+      "itsfrly/Scarevenger26WebApp",
+    deployBranch:
+      scope.node.tryGetContext("deployBranch") ??
+      process.env.SCAREVENGER_DEPLOY_BRANCH ??
+      "main",
+    githubOidcProviderExists:
+      String(
+        scope.node.tryGetContext("githubOidcProviderExists") ??
+          process.env.SCAREVENGER_GITHUB_OIDC_EXISTS ??
           "false",
       ).toLowerCase() === "true",
     alarmEmail:
