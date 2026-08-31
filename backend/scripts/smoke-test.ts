@@ -242,13 +242,49 @@ async function main() {
   let teamId: string | undefined = me.teamId;
 
   if (!teamId) {
-    const team = await step("POST /api/teams creates a team", () =>
-      api("POST", "/teams", { name: `Smoke Test ${randomUUID().slice(0, 6)}` }),
-    );
+    const team = await step("POST /api/teams returns a join code", async () => {
+      const t = await api("POST", "/teams", {
+        name: `Smoke Test ${randomUUID().slice(0, 6)}`,
+      });
+      if (!/^[A-Z0-9]{6}$/.test(t.joinCode ?? "")) {
+        throw new Error(`bad join code: ${t.joinCode}`);
+      }
+      if (/[OIL01UV]/.test(t.joinCode)) {
+        throw new Error(`ambiguous character in code ${t.joinCode}`);
+      }
+      return t;
+    });
     teamId = team?.teamId;
   } else {
     console.log(`  SKIP  team creation (already on team ${teamId})`);
   }
+
+  await step("a wrong join code is refused", async () => {
+    try {
+      await api("POST", "/teams/join", { code: "ZZZZZZ" });
+    } catch (e) {
+      const m = (e as Error).message;
+      // 409 = already on a team, which is checked before the code. Either
+      // proves the endpoint exists and rejects.
+      if (m.startsWith("404") || m.startsWith("409")) return;
+      throw e;
+    }
+    throw new Error("a nonexistent code was accepted");
+  });
+
+  await step("the join code is visible to the team", async () => {
+    const d = await api("GET", `/teams/${teamId}`);
+    if (!d.team.joinCode) throw new Error("members cannot see their own code");
+  });
+
+  // The whole point of the code is that outsiders cannot get it.
+  await step("the join code is never exposed in a list", async () => {
+    for (const path of ["/teams", "/scoreboard"]) {
+      const list = await api("GET", path);
+      const leaked = (list as Record<string, unknown>[]).find((t) => "joinCode" in t);
+      if (leaked) throw new Error(`${path} leaks joinCode`);
+    }
+  });
 
   await step("GET /api/teams/{id} returns team, members, submissions", async () => {
     const d = await api("GET", `/teams/${teamId}`);

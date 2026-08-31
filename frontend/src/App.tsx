@@ -13,6 +13,7 @@ import Scoreboard from "./routes/Scoreboard";
 import Judge from "./routes/Judge";
 import Admin from "./routes/Admin";
 import Nav from "./components/Nav";
+import TopBar from "./components/TopBar";
 
 export default function App() {
   const auth = useAuth();
@@ -63,6 +64,7 @@ function AuthedApp() {
 
   return (
     <>
+      <TopBar email={user.email} />
       <Routes>
         <Route path="/" element={<Navigate to="/challenges" replace />} />
         <Route path="/auth/callback" element={<Navigate to="/challenges" replace />} />

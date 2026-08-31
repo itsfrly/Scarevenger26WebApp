@@ -8,6 +8,7 @@ import {
   type ProofType,
 } from "shared";
 import { useChallenges, useDeleteChallenge, useSaveChallenge } from "@/lib/queries";
+import { api } from "@/lib/api";
 import { Button, Card, ErrorNote, Input, Screen, Spinner } from "@/components/ui";
 
 const BLANK: Partial<Challenge> = {
@@ -22,6 +23,8 @@ const BLANK: Partial<Challenge> = {
 export default function Admin() {
   const challenges = useChallenges();
   const [editing, setEditing] = useState<Partial<Challenge> | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   if (challenges.isLoading) return <Screen title="Challenges"><Spinner /></Screen>;
 
@@ -56,12 +59,30 @@ export default function Admin() {
             ))}
           </ul>
 
-          <a
-            href="/api/admin/export?format=csv"
-            className="mt-6 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-zinc-800 font-semibold text-zinc-100"
+          <Button
+            variant="ghost"
+            className="mt-6 w-full"
+            disabled={exporting}
+            onClick={() => {
+              setExporting(true);
+              setExportError(null);
+              api
+                .download(
+                  "/admin/export?format=csv",
+                  `scarevenger-${new Date().toISOString().slice(0, 10)}.csv`,
+                )
+                .catch((e: Error) => setExportError(e.message))
+                .finally(() => setExporting(false));
+            }}
           >
-            <Download className="size-5" /> Export scoreboard CSV
-          </a>
+            <Download className="size-5" />
+            {exporting ? "Exporting…" : "Export scoreboard CSV"}
+          </Button>
+          {exportError && (
+            <div className="mt-2">
+              <ErrorNote>{exportError}</ErrorNote>
+            </div>
+          )}
           <p className="mt-2 text-center text-xs text-zinc-600">
             Print this before the event as your paper fallback.
           </p>

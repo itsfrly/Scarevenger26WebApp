@@ -42,7 +42,33 @@ async function request<T>(
   return text ? (JSON.parse(text) as T) : ({} as T);
 }
 
+/**
+ * Fetches with the bearer token and saves the response as a file.
+ *
+ * A plain <a href> cannot be used: browser navigation sends no Authorization
+ * header and the API gateway authorizer returns 401.
+ */
+async function download(path: string, filename: string): Promise<void> {
+  const token = tokenGetter();
+  const res = await fetch(`/api${path}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    throw new ApiError(res.status, (await res.text()) || res.statusText);
+  }
+
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
+  download,
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
