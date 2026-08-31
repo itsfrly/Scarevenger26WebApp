@@ -22,7 +22,7 @@ let cachedCode: { value: string; expires: number } | undefined;
 export const handler = async (
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
 ): Promise<APIGatewayProxyResultV2> =>
-  handle(async () => {
+  handle(event, async () => {
     const c = caller(event);
 
     switch (event.routeKey) {

@@ -1,5 +1,9 @@
-import type { APIGatewayProxyResultV2 } from "aws-lambda";
+import type {
+  APIGatewayProxyEventV2WithJWTAuthorizer,
+  APIGatewayProxyResultV2,
+} from "aws-lambda";
 import { logger } from "./observability";
+import { assertFromCloudFront } from "./origin";
 
 export class HttpError extends Error {
   constructor(
@@ -21,12 +25,19 @@ export const json = (
 
 export const ok = (body: unknown) => json(200, body);
 
-// CloudFront serves the app and the API under one domain, so there is no CORS
-// layer here by design.
+/**
+ * Wraps every handler. Takes the event so the CloudFront origin check cannot
+ * be forgotten on a new route.
+ *
+ * There is no CORS layer here by design: CloudFront serves the app and the
+ * API under one domain.
+ */
 export async function handle(
+  event: APIGatewayProxyEventV2WithJWTAuthorizer,
   fn: () => Promise<APIGatewayProxyResultV2>,
 ): Promise<APIGatewayProxyResultV2> {
   try {
+    await assertFromCloudFront(event);
     return await fn();
   } catch (err) {
     if (err instanceof HttpError) {

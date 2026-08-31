@@ -3,17 +3,18 @@ import type {
   APIGatewayProxyResultV2,
 } from "aws-lambda";
 import { randomUUID } from "node:crypto";
-import { DeleteCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { keys, prefixes, type Challenge } from "shared";
 import { ddb, TABLE_NAME } from "../lib/ddb";
 import { caller, requireAdmin } from "../lib/auth";
 import { recomputeTeams } from "../lib/scoring";
+import { buildExport, scanAll, toCsv } from "../lib/export";
 import { handle, HttpError, json, ok, parseBody } from "../lib/http";
 
 export const handler = async (
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
 ): Promise<APIGatewayProxyResultV2> =>
-  handle(async () => {
+  handle(event, async () => {
     // Admins are exempt from the event-code gate: they run the event.
     requireAdmin(caller(event));
 
@@ -83,66 +84,23 @@ async function recalculateAll(): Promise<{ teams: number }> {
   return { teams: teamIds.length };
 }
 
-async function scanAll(): Promise<Record<string, unknown>[]> {
-  const items: Record<string, unknown>[] = [];
-  let startKey: Record<string, unknown> | undefined;
-  do {
-    const res = await ddb.send(
-      new ScanCommand({ TableName: TABLE_NAME, ExclusiveStartKey: startKey }),
-    );
-    items.push(...((res.Items ?? []) as Record<string, unknown>[]));
-    startKey = res.LastEvaluatedKey;
-  } while (startKey);
-  return items;
-}
-
 /**
  * Full snapshot for the paper fallback. A Scan is correct here: ~2,000 items,
  * run rarely, and the point is to capture everything rather than serve a
  * specific access pattern.
  */
 async function exportAll(format?: string): Promise<APIGatewayProxyResultV2> {
-  const items = await scanAll();
-
-  const teams = items.filter((i) => i.sk === "METADATA");
-  const challenges = items.filter((i) =>
-    String(i.sk).startsWith(prefixes.challenge),
-  );
-  const submissions = items.filter((i) =>
-    String(i.sk).startsWith(prefixes.submission),
-  );
+  const data = await buildExport();
 
   if (format === "csv") {
-    const done = new Set(submissions.map((s) => `${s.teamId}|${s.challengeId}`));
-    const header: string[] = [
-      "Team",
-      "Score",
-      ...challenges.map((c) => String(c.title)),
-    ];
-    const rows: string[][] = teams
-      .sort((a, b) => Number(b.score) - Number(a.score))
-      .map((t) => [
-        String(t.name),
-        String(t.score),
-        ...challenges.map((c) =>
-          done.has(`${t.teamId}|${c.challengeId}`) ? "X" : "",
-        ),
-      ]);
-    const csv = [header, ...rows]
-      .map((r) => r.map(csvCell).join(","))
-      .join("\n");
     return {
       statusCode: 200,
       headers: {
         "content-type": "text/csv",
         "content-disposition": `attachment; filename="scarevenger-${Date.now()}.csv"`,
       },
-      body: csv,
+      body: toCsv(data),
     };
   }
-
-  return ok({ exportedAt: new Date().toISOString(), teams, challenges, submissions });
+  return ok(data);
 }
-
-const csvCell = (v: string) =>
-  /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;

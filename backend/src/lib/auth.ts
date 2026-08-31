@@ -39,13 +39,20 @@ function groups(claim: unknown): string[] {
   return [];
 }
 
-/** Loads the caller's user record, rejecting anyone past the event-code gate. */
+/**
+ * Loads the caller's user record and enforces the event-code gate.
+ *
+ * Admins are exempt: they distribute the code and run the event, and the
+ * frontend already lets them past /join. Gating them here would let an admin
+ * reach the app and then fail on their first submission.
+ */
 export async function requireVerified(c: Caller): Promise<User> {
   const res = await ddb.send(
     new GetCommand({ TableName: TABLE_NAME, Key: keys.user(c.sub) }),
   );
   const user = res.Item as User | undefined;
-  if (!user?.eventVerified) {
+  if (!user) throw new HttpError(403, "Sign in first");
+  if (!user.eventVerified && !c.isAdmin) {
     throw new HttpError(403, "Event code required");
   }
   return user;

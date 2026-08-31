@@ -18,12 +18,14 @@ export interface ApiProps {
   readonly eventCode: secretsmanager.Secret;
   readonly userPool: cognito.UserPool;
   readonly userPoolClient: cognito.UserPoolClient;
+  readonly originSecret: secretsmanager.Secret;
 }
 
 const HANDLERS = path.join(__dirname, "../../../backend/src/handlers");
 
 export class Api extends Construct {
   readonly httpApi: apigw.HttpApi;
+  readonly functions: NodejsFunction[];
 
   constructor(scope: Construct, id: string, props: ApiProps) {
     super(scope, id);
@@ -69,6 +71,11 @@ export class Api extends Construct {
     props.mediaBucket.grantRead(challenges);
     props.table.grantReadWriteData(admin);
     props.eventCode.grantRead(me);
+    for (const fn of [me, teams, challenges, uploads, judge, admin]) {
+      props.originSecret.grantRead(fn);
+    }
+
+    this.functions = [me, teams, challenges, uploads, judge, admin];
 
     this.route("GET", "/api/me", me);
     this.route("POST", "/api/event-code", me);
@@ -110,6 +117,7 @@ export class Api extends Construct {
       environment: {
         TABLE_NAME: props.table.tableName,
         MEDIA_BUCKET: props.mediaBucket.bucketName,
+        ORIGIN_SECRET_ARN: props.originSecret.secretArn,
         POWERTOOLS_SERVICE_NAME: "scarevenger",
         POWERTOOLS_METRICS_NAMESPACE: "Scarevenger",
         ...extraEnv,

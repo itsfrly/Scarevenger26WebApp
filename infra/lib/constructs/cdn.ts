@@ -4,6 +4,7 @@ import * as apigw from "aws-cdk-lib/aws-apigatewayv2";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
 import { existsSync } from "node:fs";
@@ -12,6 +13,8 @@ import * as path from "node:path";
 export interface CdnProps {
   readonly mediaBucket: s3.Bucket;
   readonly httpApi: apigw.HttpApi;
+  readonly webAclArn: string;
+  readonly originSecret: secretsmanager.Secret;
   /** Apex domain + certificate, or undefined to use the *.cloudfront.net name. */
   readonly customDomain?: {
     readonly domainName: string;
@@ -40,8 +43,39 @@ export class Cdn extends Construct {
       autoDeleteObjects: true,
     });
 
+    // SPA routing is done by rewriting the path BEFORE it reaches an origin,
+    // not with errorResponses.
+    //
+    // errorResponses are distribution-wide with no path scoping, so mapping
+    // 403/404 to index.html silently swallowed every 403 and 404 the API
+    // returned -- the event-code gate, the admin checks, "not found" -- and
+    // handed the caller HTML instead. This rewrite only runs on the default
+    // behaviour, so API and media responses pass through untouched.
+    //
+    // CloudFront Functions run a restricted JS runtime: no startsWith,
+    // no includes, no template literals.
+    const spaRewrite = new cloudfront.Function(this, "SpaRewrite", {
+      comment: "Serve index.html for client-side routes",
+      code: cloudfront.FunctionCode.fromInline(`
+function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+  if (uri.indexOf('/api/') === 0 || uri.indexOf('/media/') === 0) {
+    return request;
+  }
+  var last = uri.substring(uri.lastIndexOf('/') + 1);
+  if (last.indexOf('.') !== -1) {
+    return request;
+  }
+  request.uri = '/index.html';
+  return request;
+}
+      `),
+    });
+
     this.distribution = new cloudfront.Distribution(this, "Distribution", {
       comment: "scarevenger",
+      webAclId: props.webAclArn,
       defaultRootObject: "index.html",
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       // North America and Europe. The event is in one town.
@@ -67,6 +101,12 @@ export class Cdn extends Construct {
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         responseHeadersPolicy:
           cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
+        functionAssociations: [
+          {
+            function: spaRewrite,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+        ],
       },
 
       additionalBehaviors: {
@@ -76,6 +116,14 @@ export class Cdn extends Construct {
         "/api/*": {
           origin: new origins.HttpOrigin(
             `${props.httpApi.apiId}.execute-api.${cdk.Stack.of(this).region}.amazonaws.com`,
+            {
+              // Proves a request came through CloudFront. The execute-api URL
+              // is public and bypasses WAF, so the API rejects anything
+              // without this header.
+              customHeaders: {
+                "x-origin-verify": props.originSecret.secretValue.unsafeUnwrap(),
+              },
+            },
           ),
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -96,23 +144,6 @@ export class Cdn extends Construct {
         },
       },
 
-      // SPA routing: the client router owns every path, so a missing key is
-      // index.html rather than an error. 200, not 404, or the browser will not
-      // render the app.
-      errorResponses: [
-        {
-          httpStatus: 403,
-          responseHttpStatus: 200,
-          responsePagePath: "/index.html",
-          ttl: cdk.Duration.minutes(5),
-        },
-        {
-          httpStatus: 404,
-          responseHttpStatus: 200,
-          responsePagePath: "/index.html",
-          ttl: cdk.Duration.minutes(5),
-        },
-      ],
     });
 
     this.deploySite();

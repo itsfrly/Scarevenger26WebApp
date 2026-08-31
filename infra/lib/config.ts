@@ -42,6 +42,12 @@ export interface ScavengerConfig {
   readonly googleClientSecretName: string;
   readonly callbackUrls: string[];
   readonly logoutUrls: string[];
+  /** Flip on once WAF COUNT metrics show no false positives. */
+  readonly blockManagedRules: boolean;
+  /** Enable the 15-minute event snapshots. Off outside the event window. */
+  readonly snapshotsEnabled: boolean;
+  /** Optional: address to receive alarm notifications. */
+  readonly alarmEmail?: string;
 }
 
 export function resolveConfig(scope: Construct): ScavengerConfig {
@@ -88,6 +94,22 @@ export function resolveConfig(scope: Construct): ScavengerConfig {
       scope.node.tryGetContext("googleClientSecretName") ??
       process.env.SCAREVENGER_GOOGLE_SECRET_NAME ??
       "scarevenger/google-oauth-client-secret",
+    snapshotsEnabled:
+      String(
+        scope.node.tryGetContext("snapshotsEnabled") ??
+          process.env.SCAREVENGER_SNAPSHOTS_ENABLED ??
+          "false",
+      ).toLowerCase() === "true",
+    alarmEmail:
+      scope.node.tryGetContext("alarmEmail") ??
+      process.env.SCAREVENGER_ALARM_EMAIL ??
+      undefined,
+    blockManagedRules:
+      String(
+        scope.node.tryGetContext("blockManagedRules") ??
+          process.env.SCAREVENGER_BLOCK_MANAGED_RULES ??
+          "false",
+      ).toLowerCase() === "true",
     callbackUrls: [
       `https://${DOMAIN_NAME}/auth/callback`,
       `${LOCAL_DEV_ORIGIN}/auth/callback`,

@@ -69,6 +69,24 @@ async function tokens(authBaseUrl: string, clientId: string, code: string) {
   return (await res.json()) as { id_token: string; access_token: string };
 }
 
+function setVerified(sub: string, value: boolean): void {
+  sh(
+    `aws dynamodb update-item --region ${REGION} --table-name scarevenger ` +
+      `--key '{"pk":{"S":"USER#${sub}"},"sk":{"S":"PROFILE"}}' ` +
+      `--update-expression "SET eventVerified = :v" ` +
+      `--expression-attribute-values '{":v":{"BOOL":${value}}}'`,
+  );
+}
+
+/** Reads cognito:groups straight off the id token. */
+function groupsFromToken(idToken: string): string[] {
+  const payload = JSON.parse(
+    Buffer.from(idToken.split(".")[1], "base64url").toString("utf8"),
+  ) as Record<string, unknown>;
+  const claim = payload["cognito:groups"];
+  return Array.isArray(claim) ? (claim as string[]) : [];
+}
+
 let passed = 0;
 let failed = 0;
 
@@ -142,20 +160,61 @@ async function main() {
 
   console.log("\nrunning checks\n");
 
+  await step("the API refuses requests that bypass CloudFront", async () => {
+    const apiId = new URL(out.ApiUrl).host;
+    const res = await fetch(`https://${apiId}/api/me`, {
+      headers: { authorization: `Bearer ${id_token}` },
+    });
+    if (res.status !== 403) {
+      throw new Error(
+        `execute-api returned ${res.status}, expected 403 — WAF can be bypassed`,
+      );
+    }
+  });
+
+  // CloudFront errorResponses are distribution-wide, so mapping 403/404 to
+  // index.html for SPA routing once swallowed every API error and returned
+  // HTML. These two lock that fix in.
+  await step("an API 404 stays a 404, not the SPA page", async () => {
+    const res = await fetch(`${base}/teams/does-not-exist`, {
+      headers: { authorization: `Bearer ${id_token}` },
+    });
+    const body = await res.text();
+    if (body.trimStart().startsWith("<")) {
+      throw new Error("got HTML — CloudFront is rewriting API errors");
+    }
+    if (res.status !== 404) throw new Error(`expected 404, got ${res.status}`);
+  });
+
   await step("GET /api/me creates the user record", async () => {
     const me = await api("GET", "/me");
     if (!me.sub) throw new Error("no sub returned");
   });
 
-  await step("POST /api/submissions is rejected before the event code", async () => {
-    try {
-      await api("POST", "/submissions", { challengeId: "x" });
-    } catch (e) {
-      if ((e as Error).message.startsWith("403")) return;
-      throw e;
-    }
-    throw new Error("expected 403, gate is not enforced");
-  });
+  // Admins bypass the gate by design, so this can only be checked as a
+  // regular player. For anyone else, clear the flag first -- otherwise a
+  // re-run passes the gate and fails on the bogus challengeId instead.
+  const meBefore = await api("GET", "/me");
+  const amAdmin = groupsFromToken(id_token).includes("admins");
+
+  if (amAdmin) {
+    console.log(
+      "  SKIP  event-code gate\n" +
+        "        You are an admin, who bypasses it by design. Run as a\n" +
+        "        non-admin account to exercise this path.",
+    );
+  } else {
+    await step("POST /api/submissions is rejected before the event code", async () => {
+      setVerified(meBefore.sub, false);
+      try {
+        await api("POST", "/submissions", { challengeId: "x" });
+      } catch (e) {
+        if ((e as Error).message.startsWith("403")) return;
+        throw e;
+      }
+      throw new Error("expected 403, gate is not enforced");
+    });
+  }
 
   await step("POST /api/event-code rejects a wrong code", async () => {
     try {
@@ -258,7 +317,7 @@ async function main() {
     if (!Array.isArray(list)) throw new Error("not an array");
   });
 
-  let isAdmin = false;
+  let isAdmin = amAdmin;
   await step("GET /api/admin/export returns a CSV scoreboard", async () => {
     try {
       const csv = await raw("GET", "/admin/export?format=csv");

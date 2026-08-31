@@ -30,7 +30,7 @@ interface SubmissionInput {
 export const handler = async (
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
 ): Promise<APIGatewayProxyResultV2> =>
-  handle(async () => {
+  handle(event, async () => {
     const c = caller(event);
     const user = await requireVerified(c);
 
