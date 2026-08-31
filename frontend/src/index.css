@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark by default: this is used outdoors at night. */
+html {
+  color-scheme: dark;
+  background: #09090b;
+  /* Keeps content clear of the iOS home indicator and notch. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+body {
+  margin: 0;
+  background: #09090b;
+  color: #fafafa;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* Stops double-tap zoom fighting the tap targets. */
+  touch-action: manipulation;
+}

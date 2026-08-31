@@ -116,6 +116,16 @@ async function main() {
     await catchRedirect(),
   );
 
+  const raw = async (method: string, path: string) => {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${id_token}` },
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`${res.status} ${text.slice(0, 200)}`);
+    return text;
+  };
+
   const api = async (method: string, path: string, body?: unknown) => {
     const res = await fetch(`${base}${path}`, {
       method,
@@ -249,11 +259,17 @@ async function main() {
   });
 
   let isAdmin = false;
-  await step("GET /api/admin/export is admin-only", async () => {
+  await step("GET /api/admin/export returns a CSV scoreboard", async () => {
     try {
-      await api("GET", "/admin/export?format=csv");
+      const csv = await raw("GET", "/admin/export?format=csv");
+      if (!csv.startsWith("Team,Score")) {
+        throw new Error(`unexpected CSV header: ${csv.slice(0, 60)}`);
+      }
+      if (csv.trim().split("\n").length < 2) {
+        throw new Error("CSV has a header but no team rows");
+      }
       isAdmin = true;
-      console.log("        (you are in the admins group)");
+      console.log("        (admin; CSV parsed, paper fallback works)");
     } catch (e) {
       if ((e as Error).message.startsWith("403")) {
         console.log("        (403 - not in the admins group; judge checks skipped)");

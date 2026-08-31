@@ -4,7 +4,10 @@ import * as apigw from "aws-cdk-lib/aws-apigatewayv2";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { Construct } from "constructs";
+import { existsSync } from "node:fs";
+import * as path from "node:path";
 
 export interface CdnProps {
   readonly mediaBucket: s3.Bucket;
@@ -110,6 +113,37 @@ export class Cdn extends Construct {
           ttl: cdk.Duration.minutes(5),
         },
       ],
+    });
+
+    this.deploySite();
+  }
+
+  /**
+   * Uploads the Vite build and invalidates the cache.
+   *
+   * Skipped when frontend/dist is missing so the stack can be deployed before
+   * the frontend has ever been built -- a missing directory would otherwise
+   * fail synth, not just deploy.
+   */
+  private deploySite(): void {
+    const dist = path.join(__dirname, "../../../frontend/dist");
+    if (!existsSync(dist)) {
+      cdk.Annotations.of(this).addWarningV2(
+        "scarevenger:no-frontend-build",
+        "frontend/dist not found - skipping site deployment. Run `npm run build --workspace=frontend` first.",
+      );
+      return;
+    }
+
+    new s3deploy.BucketDeployment(this, "DeploySite", {
+      sources: [s3deploy.Source.asset(dist)],
+      destinationBucket: this.siteBucket,
+      distribution: this.distribution,
+      // index.html must never be served stale, or people keep loading an old
+      // bundle after a deploy. Hashed assets are immutable and cached hard by
+      // the default behaviour.
+      distributionPaths: ["/index.html"],
+      prune: true,
     });
   }
 

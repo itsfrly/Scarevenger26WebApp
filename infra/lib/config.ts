@@ -8,6 +8,25 @@ import { Construct } from "constructs";
 const DOMAIN_NAME = "scarevenger.app";
 const LOCAL_DEV_ORIGIN = "http://localhost:5173";
 
+/**
+ * Extra HTTPS origin allowed through the OAuth flow, for testing on a phone.
+ * Cognito permits http:// only for localhost, so a LAN IP will not work --
+ * point a tunnel at the dev server and set this to its hostname:
+ *
+ *   export SCAREVENGER_DEV_ORIGIN=https://dev.scarevenger.app
+ */
+function devOrigin(scope: Construct): string | undefined {
+  const value =
+    scope.node.tryGetContext("devOrigin") ?? process.env.SCAREVENGER_DEV_ORIGIN;
+  if (!value) return undefined;
+  if (!String(value).startsWith("https://")) {
+    throw new Error(
+      `SCAREVENGER_DEV_ORIGIN must be https:// -- Cognito rejects http for anything but localhost. Got: ${value}`,
+    );
+  }
+  return String(value).replace(/\/$/, "");
+}
+
 export interface CustomAuthDomain {
   readonly domainName: string;
   readonly certificateArn: string;
@@ -48,6 +67,8 @@ export function resolveConfig(scope: Construct): ScavengerConfig {
         "ACM cert ARN. aws acm list-certificates --region us-east-1",
       )
     : undefined;
+
+  const dev = devOrigin(scope);
 
   return {
     domainName: DOMAIN_NAME,
