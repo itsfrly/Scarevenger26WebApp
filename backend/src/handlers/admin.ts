@@ -8,8 +8,9 @@ import {
   GetCommand,
   PutCommand,
   TransactWriteCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { keys, prefixes, type Challenge, type User } from "shared";
+import { keys, prefixes, type Challenge, type EventState, type User } from "shared";
 import { ddb, TABLE_NAME } from "../lib/ddb";
 import { caller, requireAdmin } from "../lib/auth";
 import { recomputeTeams } from "../lib/scoring";
@@ -75,6 +76,14 @@ export const handler = async (
         return ok(await movePlayer(sub, teamId ?? null));
       }
 
+      case "POST /api/admin/event": {
+        const { phase } = parseBody<{ phase?: string }>(event.body);
+        if (phase !== "open" && phase !== "ended") {
+          throw new HttpError(400, "phase must be 'open' or 'ended'");
+        }
+        return ok(await setPhase(phase));
+      }
+
       case "POST /api/admin/recalculate":
         return ok(await recalculateAll());
 
@@ -85,6 +94,31 @@ export const handler = async (
         throw new HttpError(404, "Not found");
     }
   });
+
+/**
+ * Ends or reopens the hunt.
+ *
+ * Reversible on purpose: ending is a single button at a party and will get
+ * pressed early. Reopening restores submissions; endedAt is preserved as the
+ * slideshow's shuffle seed so the order does not change under viewers who are
+ * midway through it.
+ */
+async function setPhase(phase: "open" | "ended"): Promise<EventState> {
+  const res = await ddb.send(
+    new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: keys.eventState(),
+      UpdateExpression:
+        "SET phase = :p, endedAt = if_not_exists(endedAt, :now)",
+      ExpressionAttributeValues: {
+        ":p": phase,
+        ":now": new Date().toISOString(),
+      },
+      ReturnValues: "ALL_NEW",
+    }),
+  );
+  return res.Attributes as EventState;
+}
 
 /**
  * Moves a player to another team, or off their team when teamId is null.

@@ -6,6 +6,8 @@ import {
 } from "@tanstack/react-query";
 import type {
   Challenge,
+  EventState,
+  Slide,
   Placement,
   Submission,
   SubmissionFile,
@@ -30,6 +32,29 @@ export const useChallenges = (): UseQueryResult<Challenge[]> =>
     queryFn: () => api.get<Challenge[]>("/challenges"),
     staleTime: 5 * 60_000,
   });
+
+/** Polled so a player's app notices the hunt ending without a reload. */
+export const useEventState = (): UseQueryResult<EventState> =>
+  useQuery({
+    queryKey: ["event"],
+    queryFn: () => api.get<EventState>("/event"),
+    refetchInterval: 30_000,
+  });
+
+export const useGallery = (enabled: boolean): UseQueryResult<Slide[]> =>
+  useQuery({
+    queryKey: ["gallery"],
+    queryFn: () => api.get<Slide[]>("/gallery"),
+    enabled,
+    // The reel does not change once the hunt has ended.
+    staleTime: Infinity,
+  });
+
+export const useSetEventPhase = () =>
+  useInvalidating(
+    (phase: "open" | "ended") => api.post<EventState>("/admin/event", { phase }),
+    ["event", "gallery", "challenges"],
+  );
 
 export const useTeams = (): UseQueryResult<Team[]> =>
   useQuery({ queryKey: ["teams"], queryFn: () => api.get<Team[]>("/teams") });

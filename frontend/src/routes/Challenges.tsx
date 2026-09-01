@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, ChevronRight, Copy, Trophy, X } from "lucide-react";
 import type { Challenge, Submission, User } from "shared";
-import { useChallenges, useTeam } from "@/lib/queries";
+import { useChallenges, useEventState, useTeam } from "@/lib/queries";
 import { Button, Card, ErrorNote, Screen, Spinner } from "@/components/ui";
 
 export default function Challenges({ user }: { user: User }) {
   const challenges = useChallenges();
   const team = useTeam(user.teamId);
+  const ended = useEventState().data?.phase === "ended";
 
   if (challenges.isLoading || team.isLoading) return <Screen><Spinner /></Screen>;
   if (challenges.isError) {
@@ -31,7 +32,18 @@ export default function Challenges({ user }: { user: User }) {
         </p>
       </header>
 
-      {"joinCode" in (team.data?.team ?? {}) && (
+      {ended && (
+        <Link to="/slideshow" className="mb-5 block">
+          <Card className="border-orange-500/60 bg-orange-950/20 text-center">
+            <p className="font-semibold text-orange-300">The hunt is over</p>
+            <p className="text-sm text-zinc-400">
+              Tap to watch everything everyone found
+            </p>
+          </Card>
+        </Link>
+      )}
+
+      {!ended && "joinCode" in (team.data?.team ?? {}) && (
         <InviteCard code={(team.data!.team as { joinCode: string }).joinCode} />
       )}
 

@@ -5,6 +5,7 @@ import {
   fileCountValid,
   normalizeJoinCode,
   generateJoinCode,
+  shuffleSeeded,
   type Challenge,
   type Submission,
 } from "./index";
@@ -128,4 +129,12 @@ test("generated codes avoid ambiguous characters", () => {
   const code = generateJoinCode(() => i++ % 29);
   assert.equal(code.length, 6);
   assert.ok(!/[OIL01UV]/.test(code), `ambiguous character in ${code}`);
+});
+
+test("seeded shuffle is stable for a seed and varies across seeds", () => {
+  const items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  assert.deepEqual(shuffleSeeded(items, "a"), shuffleSeeded(items, "a"));
+  assert.notDeepEqual(shuffleSeeded(items, "a"), shuffleSeeded(items, "b"));
+  assert.deepEqual([...shuffleSeeded(items, "a")].sort((x, y) => x - y), items);
+  assert.deepEqual(shuffleSeeded([], "a"), []);
 });

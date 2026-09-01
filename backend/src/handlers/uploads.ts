@@ -11,6 +11,7 @@ import {
   mediaKeyPrefix,
 } from "shared";
 import { caller, requireVerified } from "../lib/auth";
+import { requireOpen } from "../lib/event";
 import { handle, HttpError, ok, parseBody } from "../lib/http";
 import { tracer } from "../lib/observability";
 
@@ -34,6 +35,9 @@ export const handler = async (
   handle(event, async () => {
     const c = caller(event);
     const user = await requireVerified(c);
+    // Refuse the presigned URL too, not just the submission — otherwise media
+    // keeps landing in the bucket after the hunt is over.
+    await requireOpen();
     if (!user.teamId) throw new HttpError(409, "Join a team first");
 
     const { challengeId, contentType } = parseBody<{

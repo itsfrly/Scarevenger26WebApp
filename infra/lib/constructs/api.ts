@@ -54,6 +54,7 @@ export class Api extends Construct {
     const teams = this.fn("Teams", "teams.ts", props);
     const challenges = this.fn("Challenges", "challenges.ts", props);
     const uploads = this.fn("Uploads", "uploads.ts", props);
+    const gallery = this.fn("Gallery", "gallery.ts", props);
     const judge = this.fn("Judge", "judge.ts", props);
     const admin = this.fn("Admin", "admin.ts", props);
 
@@ -66,16 +67,21 @@ export class Api extends Construct {
     props.table.grantReadWriteData(challenges);
     props.table.grantReadWriteData(judge);
     props.table.grantReadData(uploads);
+    props.table.grantReadData(gallery);
     // Presigning needs PutObject; HeadObject verifies the upload landed.
     props.mediaBucket.grantPut(uploads);
     props.mediaBucket.grantRead(challenges);
     props.table.grantReadWriteData(admin);
     props.eventCode.grantRead(me);
-    for (const fn of [me, teams, challenges, uploads, judge, admin]) {
+
+    this.functions = [me, teams, challenges, uploads, gallery, judge, admin];
+
+    // Derived from this.functions rather than a second hand-written list.
+    // Every handler runs the CloudFront origin check, so a function missing
+    // this grant fails every request with an opaque 500.
+    for (const fn of this.functions) {
       props.originSecret.grantRead(fn);
     }
-
-    this.functions = [me, teams, challenges, uploads, judge, admin];
 
     this.route("GET", "/api/me", me);
     this.route("POST", "/api/event-code", me);
@@ -87,11 +93,14 @@ export class Api extends Construct {
     this.route("GET", "/api/challenges", challenges);
     this.route("POST", "/api/submissions", challenges);
     this.route("POST", "/api/uploads", uploads);
+    this.route("GET", "/api/event", gallery);
+    this.route("GET", "/api/gallery", gallery);
     this.route("GET", "/api/judge/submissions", judge);
     this.route("POST", "/api/judge/submissions/{teamId}/{challengeId}", judge);
     this.route("PUT", "/api/judge/challenges/{id}/placements", judge);
     this.route("PUT", "/api/admin/challenges", admin);
     this.route("POST", "/api/admin/recalculate", admin);
+    this.route("POST", "/api/admin/event", admin);
     this.route("POST", "/api/admin/players/{sub}/team", admin);
     this.route("DELETE", "/api/admin/challenges/{id}", admin);
     this.route("GET", "/api/admin/export", admin);

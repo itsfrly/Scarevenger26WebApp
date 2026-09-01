@@ -67,6 +67,24 @@ export interface Submission {
   reviewNote?: string;
 }
 
+export type EventPhase = "open" | "ended";
+
+export interface EventState {
+  phase: EventPhase;
+  endedAt?: string;
+}
+
+/** One slide: a single file, with the context needed to caption it. */
+export interface Slide {
+  key: string;
+  contentType: string;
+  teamId: string;
+  teamName: string;
+  challengeId: string;
+  challengeTitle: string;
+  submittedAt: string;
+}
+
 export interface User {
   sub: string;
   email: string;
@@ -130,6 +148,31 @@ export function teamScore(
   return total;
 }
 
+/**
+ * Deterministic shuffle from a seed.
+ *
+ * Seeded rather than Math.random so every viewer sees the same order — people
+ * watching together on different phones should be looking at the same slide,
+ * and it makes "go back, I missed one" possible.
+ */
+export function shuffleSeeded<T>(items: T[], seed: string): T[] {
+  const out = items.slice();
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  // Fisher-Yates driven by a xorshift PRNG.
+  for (let i = out.length - 1; i > 0; i--) {
+    h ^= h << 13;
+    h ^= h >>> 17;
+    h ^= h << 5;
+    const j = Math.abs(h) % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export function fileCountValid(challenge: Challenge, count: number): boolean {
   switch (challenge.proofType) {
     case "none":
@@ -158,6 +201,7 @@ export const keys = {
     pk: `TEAM#${teamId}`,
     sk: `SUB#${challengeId}`,
   }),
+  eventState: () => ({ pk: `EVENT#${EVENT_YEAR}`, sk: "STATE" }),
   challenge: (challengeId: string) => ({
     pk: `EVENT#${EVENT_YEAR}`,
     sk: `CHALLENGE#${challengeId}`,

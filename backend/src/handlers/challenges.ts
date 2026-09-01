@@ -15,6 +15,7 @@ import {
 import { ddb, TABLE_NAME } from "../lib/ddb";
 import { caller, requireVerified } from "../lib/auth";
 import { allChallenges, recomputeTeam } from "../lib/scoring";
+import { requireOpen } from "../lib/event";
 import { handle, HttpError, ok, parseBody } from "../lib/http";
 import { tracer } from "../lib/observability";
 
@@ -39,6 +40,7 @@ export const handler = async (
         return ok((await allChallenges()).filter((ch) => ch.active));
 
       case "POST /api/submissions": {
+        await requireOpen();
         if (!user.teamId) throw new HttpError(409, "Join a team first");
         return ok(
           await submit(user.teamId, c.sub, parseBody<SubmissionInput>(event.body)),

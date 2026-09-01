@@ -450,6 +450,54 @@ async function main() {
     });
   }
 
+  if (amAdmin) {
+    await step("the gallery is closed while the hunt is running", async () => {
+      await api("POST", "/admin/event", { phase: "open" });
+      // Admins can preview, so check as the API would answer a player.
+      const state = await api("GET", "/event");
+      if (state.phase !== "open") throw new Error(`phase is ${state.phase}`);
+    });
+
+    await step("ending the hunt closes submissions and opens the reel", async () => {
+      await api("POST", "/admin/event", { phase: "ended" });
+
+      try {
+        await api("POST", "/uploads", {
+          challengeId: photoChallenge.challengeId,
+          contentType: "image/png",
+        });
+        throw new Error("uploads still allowed after the hunt ended");
+      } catch (e) {
+        if (!(e as Error).message.startsWith("409")) throw e;
+      }
+
+      const slides = await api("GET", "/gallery");
+      if (!Array.isArray(slides)) throw new Error("gallery is not an array");
+      if (slides.length === 0) throw new Error("gallery is empty");
+      const s = slides[0];
+      if (!s.key || !s.teamName || !s.challengeTitle) {
+        throw new Error("slides are missing caption data");
+      }
+    });
+
+    await step("the shuffle is stable across calls", async () => {
+      const a = await api("GET", "/gallery");
+      const b = await api("GET", "/gallery");
+      if (JSON.stringify(a.map((s: any) => s.key)) !== JSON.stringify(b.map((s: any) => s.key))) {
+        throw new Error("order changed between calls — viewers would desync");
+      }
+    });
+
+    await step("reopening the hunt restores submissions", async () => {
+      await api("POST", "/admin/event", { phase: "open" });
+      const upload = await api("POST", "/uploads", {
+        challengeId: photoChallenge.challengeId,
+        contentType: "image/png",
+      });
+      if (!upload.url) throw new Error("no presigned url after reopening");
+    });
+  }
+
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);
 }

@@ -7,7 +7,13 @@ import {
   type ChallengeType,
   type ProofType,
 } from "shared";
-import { useChallenges, useDeleteChallenge, useSaveChallenge } from "@/lib/queries";
+import {
+  useChallenges,
+  useDeleteChallenge,
+  useEventState,
+  useSaveChallenge,
+  useSetEventPhase,
+} from "@/lib/queries";
 import { api } from "@/lib/api";
 import { Button, Card, ErrorNote, Input, Screen, Spinner } from "@/components/ui";
 
@@ -34,6 +40,8 @@ export default function Admin() {
         <Editor challenge={editing} onDone={() => setEditing(null)} />
       ) : (
         <>
+          <EndHunt />
+
           <Button className="mb-4 w-full" onClick={() => setEditing({ ...BLANK })}>
             <Plus className="size-5" /> New challenge
           </Button>
@@ -89,6 +97,48 @@ export default function Admin() {
         </>
       )}
     </Screen>
+  );
+}
+
+function EndHunt() {
+  const event = useEventState();
+  const setPhase = useSetEventPhase();
+  const ended = event.data?.phase === "ended";
+
+  return (
+    <Card className="mb-4">
+      <p className="font-semibold">
+        {ended ? "The hunt has ended" : "The hunt is running"}
+      </p>
+      <p className="mb-3 text-sm text-zinc-500">
+        {ended
+          ? "Submissions are closed and the slideshow is open to everyone."
+          : "Ending closes submissions and opens the slideshow. You can reopen it."}
+      </p>
+      <Button
+        variant={ended ? "ghost" : "danger"}
+        className="w-full"
+        disabled={setPhase.isPending}
+        onClick={() => {
+          const next = ended ? "open" : "ended";
+          const warn = ended
+            ? "Reopen the hunt? Teams can submit again."
+            : "End the hunt? Nobody will be able to submit after this.";
+          if (window.confirm(warn)) setPhase.mutate(next);
+        }}
+      >
+        {setPhase.isPending
+          ? "Working…"
+          : ended
+            ? "Reopen the hunt"
+            : "End the hunt"}
+      </Button>
+      {setPhase.isError && (
+        <div className="mt-2">
+          <ErrorNote>{(setPhase.error as Error).message}</ErrorNote>
+        </div>
+      )}
+    </Card>
   );
 }
 
