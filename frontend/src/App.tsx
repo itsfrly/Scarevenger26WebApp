@@ -93,7 +93,7 @@ function AuthedApp() {
         />
         <Route path="*" element={<Navigate to="/challenges" replace />} />
       </Routes>
-      {!gate && <Nav groups={groups} />}
+      {(!gate || exempt) && <Nav groups={groups} />}
     </>
   );
 }
