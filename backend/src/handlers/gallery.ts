@@ -30,12 +30,9 @@ export const handler = async (
 
       case "GET /api/gallery": {
         const state = await eventState();
-        // Everyone's media becomes visible only once the hunt is over. Before
-        // that a team can see only its own, via the team dashboard.
-        if (state.phase !== "ended" && !c.isAdmin) {
-          throw new HttpError(409, "The hunt is still running");
-        }
-        return ok(await slides(state.endedAt ?? "preview"));
+        // Open to every player throughout the hunt, so teams can watch each
+        // other's finds come in.
+        return ok(await slides(state.endedAt ?? "live"));
       }
 
       default:

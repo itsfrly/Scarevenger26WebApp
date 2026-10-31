@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   teamScore,
+  challengePoints,
   fileCountValid,
   normalizeJoinCode,
   generateJoinCode,
@@ -137,4 +138,28 @@ test("seeded shuffle is stable for a seed and varies across seeds", () => {
   assert.notDeepEqual(shuffleSeeded(items, "a"), shuffleSeeded(items, "b"));
   assert.deepEqual([...shuffleSeeded(items, "a")].sort((x, y) => x - y), items);
   assert.deepEqual(shuffleSeeded([], "a"), []);
+});
+
+test("challengePoints sums to teamScore", () => {
+  const challenges: Challenge[] = [
+    challenge({ challengeId: "s1", points: 10 }),
+    challenge({ challengeId: "s2", points: 5 }),
+    challenge({ challengeId: "off", points: 50, active: false }),
+    challenge({
+      challengeId: "r1",
+      type: "ranked",
+      points: undefined,
+      awards: [{ place: 1, points: 20 }, { place: 2, points: 8 }],
+      placements: [{ place: 2, teamIds: ["A", "B"] }],
+    }),
+  ];
+  const subs = [
+    submission({ challengeId: "s1" }),
+    submission({ challengeId: "s2", status: "rejected" }),
+    submission({ challengeId: "off" }),
+  ];
+  const byId = new Map(subs.map((s) => [s.challengeId, s]));
+  const parts = challenges.map((c) => challengePoints("A", c, byId.get(c.challengeId)));
+  assert.deepEqual(parts, [10, 0, 0, 8]);
+  assert.equal(parts.reduce((a, b) => a + b, 0), teamScore("A", subs, challenges));
 });

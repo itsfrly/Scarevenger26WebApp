@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Pause, Play, X } from "lucide-react";
-import { useEventState, useGallery } from "@/lib/queries";
+import { useGallery } from "@/lib/queries";
 import { Button, ErrorNote, Screen, Spinner } from "@/components/ui";
 
 const SLIDE_MS = 6000;
 
 export default function Slideshow() {
-  const event = useEventState();
-  const ended = event.data?.phase === "ended";
   const gallery = useGallery(true);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -57,17 +55,8 @@ export default function Slideshow() {
     }
   }, [index, slides]);
 
-  if (event.isLoading || gallery.isLoading) {
+  if (gallery.isLoading) {
     return <Screen><Spinner /></Screen>;
-  }
-  if (!ended && gallery.isError) {
-    return (
-      <Screen title="Not yet">
-        <p className="text-zinc-400">
-          The slideshow opens when the organizer ends the hunt.
-        </p>
-      </Screen>
-    );
   }
   if (gallery.isError) {
     return <Screen title="Slideshow"><ErrorNote>{(gallery.error as Error).message}</ErrorNote></Screen>;
@@ -75,7 +64,7 @@ export default function Slideshow() {
   if (!slide) {
     return (
       <Screen title="Slideshow">
-        <p className="text-zinc-400">No photos were submitted.</p>
+        <p className="text-zinc-400">No photos have been submitted yet.</p>
       </Screen>
     );
   }

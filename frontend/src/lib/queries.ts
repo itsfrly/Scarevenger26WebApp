@@ -46,8 +46,9 @@ export const useGallery = (enabled: boolean): UseQueryResult<Slide[]> =>
     queryKey: ["gallery"],
     queryFn: () => api.get<Slide[]>("/gallery"),
     enabled,
-    // The reel does not change once the hunt has ended.
-    staleTime: Infinity,
+    // Fresh on each visit, since the reel grows during the hunt, but never
+    // mid-watch: new slides reshuffle the order under the viewer.
+    refetchOnWindowFocus: false,
   });
 
 export const useSetEventPhase = () =>

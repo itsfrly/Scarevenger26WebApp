@@ -149,6 +149,27 @@ export function teamScore(
 }
 
 /**
+ * What one challenge contributes to a team's score: the breakdown behind
+ * teamScore, for showing points next to each submission.
+ */
+export function challengePoints(
+  teamId: string,
+  challenge: Challenge,
+  submission?: Submission,
+): number {
+  if (!challenge.active) return 0;
+  if (challenge.type === "standard") {
+    return submission && submission.status !== "rejected" ? (challenge.points ?? 0) : 0;
+  }
+  let total = 0;
+  for (const p of challenge.placements ?? []) {
+    if (!p.teamIds.includes(teamId)) continue;
+    total += challenge.awards?.find((a) => a.place === p.place)?.points ?? 0;
+  }
+  return total;
+}
+
+/**
  * Deterministic shuffle from a seed.
  *
  * Seeded rather than Math.random so every viewer sees the same order — people

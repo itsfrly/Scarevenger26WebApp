@@ -112,8 +112,8 @@ function EndHunt() {
       </p>
       <p className="mb-3 text-sm text-zinc-500">
         {ended
-          ? "Submissions are closed and the slideshow is open to everyone."
-          : "Ending closes submissions and opens the slideshow. You can reopen it."}
+          ? "Submissions are closed."
+          : "Ending closes submissions. You can reopen it."}
       </p>
       <Button
         variant={ended ? "ghost" : "danger"}
