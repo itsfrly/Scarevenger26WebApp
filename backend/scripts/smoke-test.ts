@@ -451,11 +451,12 @@ async function main() {
   }
 
   if (amAdmin) {
-    await step("the gallery is closed while the hunt is running", async () => {
+    await step("the gallery is open while the hunt is running", async () => {
       await api("POST", "/admin/event", { phase: "open" });
-      // Admins can preview, so check as the API would answer a player.
       const state = await api("GET", "/event");
       if (state.phase !== "open") throw new Error(`phase is ${state.phase}`);
+      const slides = await api("GET", "/gallery");
+      if (!Array.isArray(slides)) throw new Error("gallery is not an array");
     });
 
     await step("ending the hunt closes submissions and opens the reel", async () => {

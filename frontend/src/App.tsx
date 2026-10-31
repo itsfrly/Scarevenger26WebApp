@@ -13,6 +13,7 @@ import Scoreboard from "./routes/Scoreboard";
 import Judge from "./routes/Judge";
 import Admin from "./routes/Admin";
 import Slideshow from "./routes/Slideshow";
+import TeamView from "./routes/TeamView";
 import Nav from "./components/Nav";
 import TopBar from "./components/TopBar";
 
@@ -74,6 +75,7 @@ function AuthedApp() {
         <Route path="/challenges" element={<Challenges user={user} />} />
         <Route path="/challenges/:id" element={<ChallengeDetail user={user} />} />
         <Route path="/scoreboard" element={<Scoreboard user={user} />} />
+        <Route path="/teams/:id" element={<TeamView user={user} />} />
         <Route path="/slideshow" element={<Slideshow />} />
         <Route
           path="/judge"
