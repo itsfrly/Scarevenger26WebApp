@@ -1,19 +1,22 @@
 import { useLayoutEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, ChevronRight, Copy, Trophy, X } from "lucide-react";
+import { Check, ChevronRight, Copy, Search, Trophy, X } from "lucide-react";
 import type { Challenge, Submission, User } from "shared";
 import { useChallenges, useEventState, useTeam } from "@/lib/queries";
-import { Button, Card, ErrorNote, Screen, Spinner } from "@/components/ui";
+import { Button, Card, ErrorNote, Input, Screen, Spinner } from "@/components/ui";
 
-// Kept outside the component so it survives the list unmounting while a
-// challenge is open; closing the challenge then lands back in the same spot.
+// Kept outside the component so they survive the list unmounting while a
+// challenge is open; closing the challenge then lands back in the same spot,
+// with the same search still applied.
 let savedScrollY = 0;
+let savedQuery = "";
 
 export default function Challenges({ user }: { user: User }) {
   const challenges = useChallenges();
   const team = useTeam(user.teamId);
   const ended = useEventState().data?.phase === "ended";
   const ready = !challenges.isLoading && !team.isLoading;
+  const [query, setQuery] = useState(savedQuery);
 
   // Restore once the rows exist, then track scrolling. The listener is gone
   // before the next page renders, so its shorter height can't clobber this.
@@ -40,6 +43,18 @@ export default function Challenges({ user }: { user: User }) {
     (c) => byChallenge.get(c.challengeId)?.status === "submitted",
   ).length;
 
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = terms.length
+    ? list.filter((c) => {
+        const text = `${c.title} ${c.description}`.toLowerCase();
+        return terms.every((t) => text.includes(t));
+      })
+    : list;
+  const search = (value: string) => {
+    savedQuery = value;
+    setQuery(value);
+  };
+
   return (
     <Screen>
       <header className="mb-5">
@@ -64,8 +79,33 @@ export default function Challenges({ user }: { user: User }) {
         <InviteCard code={(team.data!.team as { joinCode: string }).joinCode} />
       )}
 
+      <div className="relative mb-3">
+        <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-zinc-500" />
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => search(e.target.value)}
+          placeholder="Search challenges"
+          aria-label="Search challenges"
+          className="pl-12 pr-12 [&::-webkit-search-cancel-button]:appearance-none"
+        />
+        {query && (
+          <button
+            onClick={() => search("")}
+            aria-label="Clear search"
+            className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center text-zinc-500"
+          >
+            <X className="size-5" />
+          </button>
+        )}
+      </div>
+
+      {terms.length > 0 && shown.length === 0 && (
+        <p className="py-8 text-center text-zinc-500">No challenges match “{query.trim()}”</p>
+      )}
+
       <ul className="space-y-2">
-        {list.map((c) => (
+        {shown.map((c) => (
           <li key={c.challengeId}>
             <Row challenge={c} submission={byChallenge.get(c.challengeId)} />
           </li>
