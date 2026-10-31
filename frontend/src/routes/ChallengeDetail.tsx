@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Camera } from "lucide-react";
 import { DEFAULT_MAX_FILES, fileCountValid, type SubmissionFile, type User } from "shared";
@@ -18,6 +18,9 @@ export default function ChallengeDetail({ user }: { user: User }) {
   const [metric, setMetric] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The window keeps the list's scroll offset; open each challenge at its top.
+  useLayoutEffect(() => window.scrollTo(0, 0), [id]);
 
   if (challenges.isLoading || team.isLoading) return <Screen><Spinner /></Screen>;
 

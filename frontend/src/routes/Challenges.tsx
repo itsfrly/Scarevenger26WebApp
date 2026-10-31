@@ -1,14 +1,31 @@
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, ChevronRight, Copy, Trophy, X } from "lucide-react";
 import type { Challenge, Submission, User } from "shared";
 import { useChallenges, useEventState, useTeam } from "@/lib/queries";
 import { Button, Card, ErrorNote, Screen, Spinner } from "@/components/ui";
 
+// Kept outside the component so it survives the list unmounting while a
+// challenge is open; closing the challenge then lands back in the same spot.
+let savedScrollY = 0;
+
 export default function Challenges({ user }: { user: User }) {
   const challenges = useChallenges();
   const team = useTeam(user.teamId);
   const ended = useEventState().data?.phase === "ended";
+  const ready = !challenges.isLoading && !team.isLoading;
+
+  // Restore once the rows exist, then track scrolling. The listener is gone
+  // before the next page renders, so its shorter height can't clobber this.
+  useLayoutEffect(() => {
+    if (!ready) return;
+    window.scrollTo(0, savedScrollY);
+    const onScroll = () => {
+      savedScrollY = window.scrollY;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [ready]);
 
   if (challenges.isLoading || team.isLoading) return <Screen><Spinner /></Screen>;
   if (challenges.isError) {
