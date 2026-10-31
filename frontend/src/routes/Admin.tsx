@@ -15,6 +15,7 @@ import {
   useSetEventPhase,
 } from "@/lib/queries";
 import { api } from "@/lib/api";
+import { CategoryList } from "@/components/CategoryList";
 import { Button, Card, ErrorNote, Input, Screen, Spinner } from "@/components/ui";
 
 const BLANK: Partial<Challenge> = {
@@ -37,7 +38,11 @@ export default function Admin() {
   return (
     <Screen title="Challenges">
       {editing ? (
-        <Editor challenge={editing} onDone={() => setEditing(null)} />
+        <Editor
+          challenge={editing}
+          categories={existingCategories(challenges.data ?? [])}
+          onDone={() => setEditing(null)}
+        />
       ) : (
         <>
           <EndHunt />
@@ -46,26 +51,24 @@ export default function Admin() {
             <Plus className="size-5" /> New challenge
           </Button>
 
-          <ul className="space-y-2">
-            {(challenges.data ?? []).map((c) => (
-              <li key={c.challengeId}>
-                <Card className="flex items-center gap-3">
-                  <button
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => setEditing(c)}
-                  >
-                    <p className="truncate font-medium">{c.title}</p>
-                    <p className="text-sm text-zinc-500">
-                      {c.type === "ranked"
-                        ? `Ranked · ${c.awards?.map((a) => a.points).join("/")}`
-                        : `${c.points} pts`}{" "}
-                      · {c.proofType}
-                    </p>
-                  </button>
-                </Card>
-              </li>
-            ))}
-          </ul>
+          <CategoryList challenges={challenges.data ?? []}>
+            {(c) => (
+              <Card className="flex items-center gap-3">
+                <button
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => setEditing(c)}
+                >
+                  <p className="truncate font-medium">{c.title}</p>
+                  <p className="text-sm text-zinc-500">
+                    {c.type === "ranked"
+                      ? `Ranked · ${c.awards?.map((a) => a.points).join("/")}`
+                      : `${c.points} pts`}{" "}
+                    · {c.proofType}
+                  </p>
+                </button>
+              </Card>
+            )}
+          </CategoryList>
 
           <Button
             variant="ghost"
@@ -142,11 +145,19 @@ function EndHunt() {
   );
 }
 
+/** Offered as suggestions so admins reuse a spelling instead of inventing a near-duplicate. */
+function existingCategories(challenges: Challenge[]): string[] {
+  const names = challenges.map((c) => c.category?.trim()).filter(Boolean) as string[];
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+}
+
 function Editor({
   challenge,
+  categories,
   onDone,
 }: {
   challenge: Partial<Challenge>;
+  categories: string[];
   onDone: () => void;
 }) {
   const [draft, setDraft] = useState(challenge);
@@ -173,6 +184,20 @@ function Editor({
           value={draft.description ?? ""}
           onChange={(e) => set("description", e.target.value)}
         />
+      </Field>
+
+      <Field label="Category (optional)">
+        <Input
+          list="challenge-categories"
+          placeholder="e.g. Around the house"
+          value={draft.category ?? ""}
+          onChange={(e) => set("category", e.target.value)}
+        />
+        <datalist id="challenge-categories">
+          {categories.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
       </Field>
 
       <Field label="Type">

@@ -13,26 +13,31 @@ const CHALLENGES: Omit<Challenge, "challengeId">[] = [
   {
     title: "Group photo with a jack-o'-lantern",
     description: "Whole team in frame.",
+    category: "Around the neighbourhood",
     active: true, type: "standard", proofType: "photo", points: 10,
   },
   {
     title: "Sing a whole verse of the Monster Mash",
     description: "Honour system. We will know.",
+    category: "Performances",
     active: true, type: "standard", proofType: "none", points: 5,
   },
   {
     title: "Three houses with inflatable decorations",
     description: "One photo each.",
+    category: "Around the neighbourhood",
     active: true, type: "standard", proofType: "photos", maxFiles: 3, points: 20,
   },
   {
     title: "Film your best scream",
     description: "Ten seconds, one take.",
+    category: "Performances",
     active: true, type: "standard", proofType: "video", points: 25,
   },
   {
     title: "Highest skeeball score",
     description: "Photo of the machine showing your score.",
+    category: "Competitions",
     active: true, type: "ranked", proofType: "photo",
     awards: [
       { place: 1, points: 50 },

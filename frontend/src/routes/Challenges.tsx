@@ -4,6 +4,7 @@ import { Check, ChevronRight, Copy, Trophy, X } from "lucide-react";
 import type { Challenge, Submission, User } from "shared";
 import { useChallenges, useEventState, useTeam } from "@/lib/queries";
 import { Button, Card, ErrorNote, Screen, Spinner } from "@/components/ui";
+import { CategoryList } from "@/components/CategoryList";
 
 export default function Challenges({ user }: { user: User }) {
   const challenges = useChallenges();
@@ -47,13 +48,9 @@ export default function Challenges({ user }: { user: User }) {
         <InviteCard code={(team.data!.team as { joinCode: string }).joinCode} />
       )}
 
-      <ul className="space-y-2">
-        {list.map((c) => (
-          <li key={c.challengeId}>
-            <Row challenge={c} submission={byChallenge.get(c.challengeId)} />
-          </li>
-        ))}
-      </ul>
+      <CategoryList challenges={list}>
+        {(c) => <Row challenge={c} submission={byChallenge.get(c.challengeId)} />}
+      </CategoryList>
     </Screen>
   );
 }

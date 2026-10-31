@@ -41,6 +41,7 @@ export const handler = async (
           challengeId: body.challengeId ?? randomUUID(),
           title: body.title.trim(),
           description: body.description ?? "",
+          category: body.category?.trim() || undefined,
           active: body.active ?? true,
           type,
           proofType: body.proofType ?? "photo",

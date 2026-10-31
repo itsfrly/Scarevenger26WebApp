@@ -6,6 +6,7 @@ import {
   normalizeJoinCode,
   generateJoinCode,
   shuffleSeeded,
+  groupByCategory,
   type Challenge,
   type Submission,
 } from "./index";
@@ -137,4 +138,28 @@ test("seeded shuffle is stable for a seed and varies across seeds", () => {
   assert.notDeepEqual(shuffleSeeded(items, "a"), shuffleSeeded(items, "b"));
   assert.deepEqual([...shuffleSeeded(items, "a")].sort((x, y) => x - y), items);
   assert.deepEqual(shuffleSeeded([], "a"), []);
+});
+
+test("groupByCategory sorts categories and puts uncategorised last", () => {
+  const groups = groupByCategory([
+    challenge({ challengeId: "a", category: "Outdoors" }),
+    challenge({ challengeId: "b" }),
+    challenge({ challengeId: "c", category: "food " }),
+    challenge({ challengeId: "d", category: "Food" }),
+    challenge({ challengeId: "e", category: "  " }),
+  ]);
+  assert.deepEqual(
+    groups.map((g) => [g.category, g.challenges.map((c) => c.challengeId)]),
+    [
+      ["food", ["c", "d"]],
+      ["Outdoors", ["a"]],
+      [undefined, ["b", "e"]],
+    ],
+  );
+});
+
+test("groupByCategory with no categories is a single group", () => {
+  const groups = groupByCategory([challenge({}), challenge({ challengeId: "c2" })]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].category, undefined);
 });

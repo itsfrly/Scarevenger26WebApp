@@ -31,6 +31,8 @@ export interface Challenge {
   challengeId: string;
   title: string;
   description: string;
+  /** Free text, e.g. "Around the house". Unset means uncategorised. */
+  category?: string;
   active: boolean;
   type: ChallengeType;
   proofType: ProofType;
@@ -170,6 +172,40 @@ export function shuffleSeeded<T>(items: T[], seed: string): T[] {
     const j = Math.abs(h) % (i + 1);
     [out[i], out[j]] = [out[j], out[i]];
   }
+  return out;
+}
+
+export interface ChallengeGroup {
+  /** Undefined for the uncategorised group. */
+  category?: string;
+  challenges: Challenge[];
+}
+
+/**
+ * Groups challenges by category for display: categories alphabetically,
+ * uncategorised last. Matching ignores case and surrounding spaces so "Food"
+ * and "food " don't split into two headings; the first spelling seen wins.
+ * Order within a group is preserved.
+ */
+export function groupByCategory(challenges: Challenge[]): ChallengeGroup[] {
+  const groups = new Map<string, ChallengeGroup>();
+  const none: ChallengeGroup = { challenges: [] };
+
+  for (const c of challenges) {
+    const name = c.category?.trim();
+    if (!name) {
+      none.challenges.push(c);
+      continue;
+    }
+    const k = name.toLowerCase();
+    if (!groups.has(k)) groups.set(k, { category: name, challenges: [] });
+    groups.get(k)!.challenges.push(c);
+  }
+
+  const out = [...groups.values()].sort((a, b) =>
+    a.category!.localeCompare(b.category!),
+  );
+  if (none.challenges.length) out.push(none);
   return out;
 }
 
