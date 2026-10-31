@@ -17,7 +17,7 @@ const EVENT_CODE_SECRET_ARN = process.env.EVENT_CODE_SECRET_ARN!;
 // with a TTL: without one, rotating the code mid-event would leave warm
 // containers accepting the old value indefinitely.
 const CACHE_TTL_MS = 5 * 60 * 1000;
-let cachedCode: { value: string; expires: number } | undefined;
+let cachedCodes: { value: string[]; expires: number } | undefined;
 
 export const handler = async (
   event: APIGatewayProxyEventV2WithJWTAuthorizer,
@@ -33,7 +33,14 @@ export const handler = async (
         const { code } = parseBody<{ code?: string }>(event.body);
         if (!code) throw new HttpError(400, "Code required");
 
-        if (!timingSafeEqual(code.trim(), await eventCode())) {
+        // Check every code rather than stopping at the first match, so the
+        // response time does not reveal which line matched.
+        const given = normalizeCode(code);
+        const matched = (await eventCodes()).reduce(
+          (hit, valid) => timingSafeEqual(given, valid) || hit,
+          false,
+        );
+        if (!matched) {
           metrics.addMetric("EventCodeRejected", "Count", 1);
           metrics.publishStoredMetrics();
           logger.warn("event code rejected", { sub: c.sub });
@@ -98,16 +105,26 @@ async function getOrCreateUser(
   return res.Attributes as User;
 }
 
-async function eventCode(): Promise<string> {
-  if (cachedCode && cachedCode.expires > Date.now()) return cachedCode.value;
+/**
+ * One accepted code per line of the secret, so a second code is a console
+ * edit rather than a deploy. Blank lines are ignored.
+ */
+async function eventCodes(): Promise<string[]> {
+  if (cachedCodes && cachedCodes.expires > Date.now()) return cachedCodes.value;
   const res = await secrets.send(
     new GetSecretValueCommand({ SecretId: EVENT_CODE_SECRET_ARN }),
   );
-  cachedCode = {
-    value: (res.SecretString ?? "").trim(),
+  cachedCodes = {
+    value: (res.SecretString ?? "").split("\n").map(normalizeCode).filter(Boolean),
     expires: Date.now() + CACHE_TTL_MS,
   };
-  return cachedCode.value;
+  return cachedCodes.value;
+}
+
+// Phrases are read aloud and typed on phones, which capitalize the first
+// word and sometimes double a space. Neither should cost anyone entry.
+function normalizeCode(code: string): string {
+  return code.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 // Constant-time compare so a wrong code cannot be narrowed by response timing.
