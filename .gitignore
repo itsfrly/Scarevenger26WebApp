@@ -21,6 +21,3 @@ frontend/dist/
 
 # macOS
 .DS_Store
-HANDOFF.md
-PREREQUISITES.md
-ARCHITECTURE.md
