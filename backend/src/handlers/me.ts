@@ -2,7 +2,7 @@ import type {
   APIGatewayProxyEventV2WithJWTAuthorizer,
   APIGatewayProxyResultV2,
 } from "aws-lambda";
-import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { keys, type User } from "shared";
 import { ddb, TABLE_NAME } from "../lib/ddb";
@@ -27,7 +27,7 @@ export const handler = async (
 
     switch (event.routeKey) {
       case "GET /api/me":
-        return ok(await getOrCreateUser(c.sub, c.email, c.displayName));
+        return ok(await dropMissingTeam(await getOrCreateUser(c.sub, c.email, c.displayName)));
 
       case "POST /api/event-code": {
         const { code } = parseBody<{ code?: string }>(event.body);
@@ -96,6 +96,53 @@ async function getOrCreateUser(
     }),
   );
   return res.Attributes as User;
+}
+
+/**
+ * Clears a teamId whose team no longer exists.
+ *
+ * Teams have no delete endpoint, so one removed by hand in DynamoDB leaves its
+ * players pointing at nothing: the client only sends players without a teamId
+ * to /team, and joining requires attribute_not_exists(teamId), so they could
+ * neither use the old team nor pick a new one. Repairing it here, on the call
+ * every page load makes, needs no admin action.
+ */
+async function dropMissingTeam(user: User): Promise<User> {
+  if (!user.teamId) return user;
+  const team = await ddb.send(
+    new GetCommand({
+      TableName: TABLE_NAME,
+      Key: keys.team(user.teamId),
+      ProjectionExpression: "pk",
+    }),
+  );
+  if (team.Item) return user;
+
+  logger.warn("clearing missing team", { sub: user.sub, teamId: user.teamId });
+  try {
+    await ddb.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          { Delete: { TableName: TABLE_NAME, Key: keys.member(user.teamId, user.sub) } },
+          {
+            Update: {
+              TableName: TABLE_NAME,
+              Key: keys.user(user.sub),
+              UpdateExpression: "REMOVE teamId",
+              // Only if they have not been moved since the read above.
+              ConditionExpression: "teamId = :t",
+              ExpressionAttributeValues: { ":t": user.teamId },
+            },
+          },
+        ],
+      }),
+    );
+  } catch (err) {
+    if ((err as Error).name !== "TransactionCanceledException") throw err;
+    return user;
+  }
+  const { teamId: _, ...rest } = user;
+  return rest;
 }
 
 async function eventCode(): Promise<string> {
