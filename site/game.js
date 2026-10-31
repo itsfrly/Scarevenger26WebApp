@@ -28,7 +28,7 @@
   ];
   const CIVILIAN_LINES = [
     "I'm not security.", "Happy Halloween!", "Ask a guard?", "Do I look armed?",
-    "Nice costume.", "Wrong person, pal.", "I'm just here for fro-yo.",
+    "Nice costume.", "Wrong person, pal.", "I'm just here for a movie.", "Spencer's is that way.",
     "Leave me out of this.", "Is this for that hunt?", "Boo.",
     "Try the guy in the navy shirt.", "I'm a ghost. I can't hold anything.",
   ];
@@ -111,12 +111,12 @@
     }
 
     const stores = [
-      [0, 230, 275, "BOO-TIQUE", "#c04fd6", "#5a2a63"],
-      [230, 450, 260, "CANTINA", "#4fd6a0", "#2a5a49"],
-      [450, 680, 240, "CINEMA", "#ffd65a", "#6b2a2a"],
-      [920, 1150, 255, "ARCADE", "#5ab8ff", "#2a3e6b"],
-      [1150, 1380, 280, "CANDLE CO.", "#ff9f5a", "#5a3a2a"],
-      [1380, 1600, 265, "FRO-YO", "#ff6fb5", "#4a2a4a"],
+      [0, 230, 275, "BARNES & NOBLE", "#6fe0a0", "#24453a"],
+      [230, 450, 260, "CLAIRE'S", "#ff7ad9", "#5a2a55"],
+      [450, 680, 240, "AMC", "#ff4a4a", "#3a1a1f"],
+      [920, 1150, 255, "SPENCER'S", "#ffe14a", "#2a2a2a"],
+      [1150, 1380, 280, "JOURNEYS", "#f3f0ea", "#1f1f26"],
+      [1380, 1600, 265, "H&M", "#ff3b3b", "#4a2a2e"],
     ];
     for (const [x0, x1, top, name, neon, wall] of stores) {
       const w = x1 - x0;
@@ -128,7 +128,9 @@
       }
       el("text", {
         x: x0 + w / 2, y: top + 52, "text-anchor": "middle", fill: neon, filter: "url(#glow)",
-        "font-family": "ui-sans-serif, system-ui, sans-serif", "font-weight": 800, "font-size": 26, "letter-spacing": 2,
+        // Long names shrink to fit the storefront.
+        "font-family": "ui-sans-serif, system-ui, sans-serif", "font-weight": 800,
+        "font-size": Math.min(name.length <= 3 ? 40 : 26, (w - 28) / (name.length * 0.78)), "letter-spacing": 2,
       }, svg).textContent = name;
     }
 
