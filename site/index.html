@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scarevenger 2026</title>
+  <meta name="description" content="Final standings, every photo and video from the hunt, and one very important question for mall security.">
+  <meta property="og:title" content="Scarevenger 2026">
+  <meta property="og:description" content="Final standings, every photo and video from the hunt, and one very important question for mall security.">
+  <meta name="theme-color" content="#120c18">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎃</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Desert Ridge · 2026</p>
+      <h1>Scarevenger</h1>
+      <p class="lede">The hunt is over. The evidence survives. Thanks for playing, and see you next year.</p>
+    </header>
+
+    <section class="card drive">
+      <div>
+        <h2>The evidence</h2>
+        <p>Every photo and video from the hunt, sorted into a folder per team.</p>
+      </div>
+      <a class="button" href="https://drive.google.com/drive/folders/1TKxvGlXK6H0lJaGztEhIK6msknXve388" target="_blank" rel="noopener">Open the Google Drive</a>
+    </section>
+
+    <section class="card">
+      <h2>Final standings</h2>
+      <ol class="standings">
+        <li class="podium gold"><span class="place">1</span><span class="team">The Pirates Who Don't Do Anything</span><span class="score">1107</span></li>
+        <li class="podium silver"><span class="place">2</span><span class="team">Sloppy love</span><span class="score">932</span></li>
+        <li class="podium bronze"><span class="place">3</span><span class="team">CDC (classic Disney characters)</span><span class="score">647</span></li>
+        <li><span class="place">4</span><span class="team">the five skins (ba dum tiss)</span><span class="score">602</span></li>
+        <li><span class="place">5</span><span class="team">Swanfarleys</span><span class="score">592</span></li>
+        <li><span class="place">6</span><span class="team">Super Mario Bros All Stars</span><span class="score">590</span></li>
+        <li><span class="place">7</span><span class="team">Butter beer Baddies</span><span class="score">395</span></li>
+        <li><span class="place">8</span><span class="team">Crawlers</span><span class="score">365</span></li>
+        <li><span class="place">9</span><span class="team">Lumon</span><span class="score">340</span></li>
+        <li><span class="place">10</span><span class="team">Team Fashionably Late</span><span class="score">332</span></li>
+      </ol>
+    </section>
+
+    <section class="card game" id="game">
+      <h2>Ask Security</h2>
+      <p>One challenge from the hunt, revisited. Find every security guard at Desert Ridge and ask, politely, if you can hold their gun.</p>
+
+      <div class="hud" aria-live="polite">
+        <span>Guards asked <strong id="guards-found">0</strong>/<strong id="guards-total">8</strong></span>
+        <span>Guns held <strong>0</strong></span>
+        <span>Wrong people <strong id="misses">0</strong></span>
+        <span class="timer" id="timer">0:00</span>
+        <button type="button" class="ghost" id="restart">Restart</button>
+      </div>
+
+      <div class="stage">
+        <div class="scroller" id="scroller">
+          <svg id="scene" role="img" aria-label="A night-time outdoor mall full of costumed shoppers and a few security guards"></svg>
+        </div>
+        <p class="swipe-hint">Swipe to look around</p>
+
+        <div class="win" id="win" hidden>
+          <div class="win-card">
+            <h3>Every guard asked.</h3>
+            <p class="big">Guns held: 0</p>
+            <p>Time <strong id="win-time"></strong> · Wrong people <strong id="win-misses"></strong></p>
+            <p class="muted" id="win-best"></p>
+            <button type="button" class="button" id="play-again">Ask again</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>See you next Halloween. 🎃</footer>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,26 +1,10 @@
-node_modules/
-dist/
-*.tsbuildinfo
-
-# CDK
-infra/cdk.out/
-cdk.out/
-# Holds resolved context values, including anything passed with -c.
-cdk.context.json
-
-# Local env / credentials
-.env
-.env.*
-!.env.example
-
-# Frontend build output
-frontend/dist/
-
-# Vite transpiles a TS config to a temp file; normally cleaned up immediately.
-*.timestamp-*.mjs
-
-# macOS
 .DS_Store
+
+# Leftovers from the AWS app (see archive/aws-app), kept locally until the
+# stack is torn down.
+node_modules/
+infra/
+frontend/
 HANDOFF.md
 PREREQUISITES.md
 ARCHITECTURE.md

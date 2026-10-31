@@ -1,16 +1,30 @@
-# Scavenger Hunt App
+# Scarevenger
 
-Invite-only web app for an annual friend-group Halloween scavenger hunt.
-Teams sign up (Google sign-in via Cognito + a shared event code), upload a
-photo/video to validate each challenge, and scores are calculated
-automatically.
+Wrap-up page for the 2026 Halloween scavenger hunt at Desert Ridge: final
+standings, a link to the Google Drive holding every team's photos and videos,
+and *Ask Security*, a small point-and-click game where you find the mall's
+security guards and ask to hold their gun.
 
-## Structure
-- `infra/` — AWS CDK app (single stack)
-- `backend/` — Lambda handlers
-- `frontend/` — React + Vite + TS + Tailwind + ShadCN
-- `shared/` — TypeScript types shared between backend and frontend
+## Layout
 
-## Status
-Scaffolding only — infrastructure decisions are being made incrementally.
-See commit history / conversation notes for what's been decided vs. still open.
+Plain static files, no build step:
+
+- `site/index.html`: the page, with the standings written in directly
+- `site/styles.css`
+- `site/game.js`: the game, drawn as a single SVG scene
+
+Open `site/index.html` in a browser to try it locally.
+
+## Hosting
+
+Cloudflare Pages, connected to this repo:
+
+- Production branch: `main`
+- Build command: none
+- Build output directory: `site`
+
+## The original app
+
+The event itself ran on a full AWS app (CDK, Cognito, API Gateway, Lambda,
+DynamoDB, S3, CloudFront). It's preserved on the `archive/aws-app` branch and
+the `aws-app-final` tag.
